@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Grok Sync
+Comment=Move Grok downloads to Pictures and sync to WD NAS
+Exec=/home/jlc/bin/grok-sync-launch.sh
+Icon=grok-sync
+Terminal=false
+Categories=Utility;
+Keywords=sync;nas;grok;rsync;

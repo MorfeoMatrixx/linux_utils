@@ -1,0 +1,33 @@
+moved=0
+skipped=()
+for f in "$DOWNLOADS_DIR"/grok-image* "$DOWNLOADS_DIR"/grok-video*; do
+    [ -f "$f" ] || continue
+    dest="$LOCAL_GROK_DIR/$(basename "$f")"
+    if [ -e "$dest" ]; then
+        skipped+=("$f")
+    else
+        mv -- "$f" "$LOCAL_GROK_DIR"/
+        moved=$((moved + 1))
+    fi
+done
+
+log "Moved $moved file(s) to $LOCAL_GROK_DIR"
+
+if [ ${#skipped[@]} -gt 0 ]; then
+    if [ ${#skipped[@]} -le 20 ]; then
+        log "Skipped ${#skipped[@]} file(s) already in $LOCAL_GROK_DIR:"
+        for f in "${skipped[@]}"; do log "  $(basename "$f")"; done
+    else
+        log "Skipped ${#skipped[@]} files already in $LOCAL_GROK_DIR (too many to list)"
+    fi
+
+    printf '\nDelete %d skipped file(s) from Downloads? [y/N] ' "${#skipped[@]}"
+    read -r answer </dev/tty
+    if [[ "${answer,,}" == "y" ]]; then
+        for f in "${skipped[@]}"; do
+            rm -- "$f" && log "Deleted: $(basename "$f")"
+        done
+    else
+        log "Skipped files left in Downloads"
+    fi
+fi
