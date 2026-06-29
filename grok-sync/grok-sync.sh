@@ -16,10 +16,33 @@ log() { printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG_FILE"; }
 
 log "=== Starting grok-sync ==="
 
-# 1. Move grok-image*/grok-video* files out of Downloads
+MEDIA_EXT_RE='\.(jpg|jpeg|png|gif|webp|bmp|heic|mp4|mov|webm|mkv|avi)$'
+
+# 1. Move grok-image*/grok-video* files, plus image/video files whose first 8
+#    filename chars are lowercase letters/digits only (Grok's hashed names),
+#    out of Downloads
 moved=0
 skipped=()
-for f in "$DOWNLOADS_DIR"/grok-image* "$DOWNLOADS_DIR"/grok-video*; do
+candidates=()
+shopt -s nocasematch
+
+while IFS= read -r -d '' f; do
+    base="$(basename "$f")"
+    [[ "$base" =~ $MEDIA_EXT_RE ]] || continue
+    candidates+=("$f")
+done < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f \( -iname 'grok-image*' -o -iname 'grok-video*' \) -print0)
+
+while IFS= read -r -d '' f; do
+    base="$(basename "$f")"
+    prefix="${base:0:8}"
+    [[ ${#prefix} -eq 8 && "$prefix" =~ ^[a-z0-9]{8}$ && "$prefix" =~ [a-z] && "$prefix" =~ [0-9] ]] || continue
+    [[ "$base" =~ $MEDIA_EXT_RE ]] || continue
+    candidates+=("$f")
+done < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f -print0)
+
+shopt -u nocasematch
+
+for f in "${candidates[@]}"; do
     [ -f "$f" ] || continue
     dest="$LOCAL_GROK_DIR/$(basename "$f")"
     if [ -e "$dest" ]; then
