@@ -18,9 +18,9 @@ log "=== Starting grok-sync ==="
 
 MEDIA_EXT_RE='\.(jpg|jpeg|png|gif|webp|bmp|heic|mp4|mov|webm|mkv|avi)$'
 
-# 1. Move grok-image*/grok-video* files, plus image/video files whose first 8
-#    filename chars are lowercase letters/digits only (Grok's hashed names),
-#    out of Downloads
+# 1. Move grok-image*/grok-video*/imagine-* files, plus image/video files
+#    whose first 8 filename chars are lowercase letters/digits only (Grok's
+#    hashed names), out of Downloads
 moved=0
 skipped=()
 candidates=()
@@ -30,7 +30,7 @@ while IFS= read -r -d '' f; do
     base="$(basename "$f")"
     [[ "$base" =~ $MEDIA_EXT_RE ]] || continue
     candidates+=("$f")
-done < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f \( -iname 'grok-image*' -o -iname 'grok-video*' \) -print0)
+done < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f \( -iname 'grok-image*' -o -iname 'grok-video*' -o -iname 'imagine-*' \) -print0)
 
 while IFS= read -r -d '' f; do
     base="$(basename "$f")"
