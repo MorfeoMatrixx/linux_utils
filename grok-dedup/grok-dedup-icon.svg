@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+
+  <!-- background rounded square -->
+  <rect width="512" height="512" rx="80" fill="#1a1a2e"/>
+
+  <!-- back photo (duplicate) — offset up-right -->
+  <rect x="180" y="52" width="260" height="210" rx="18" fill="#2176ae" opacity="0.55"/>
+  <rect x="196" y="68" width="228" height="140" rx="8" fill="#1a5f8a" opacity="0.7"/>
+  <circle cx="224" cy="102" r="22" fill="#e8c840" opacity="0.6"/>
+  <path d="M204 192 Q240 164 278 178 Q308 190 348 166" fill="none" stroke="#6ab4e8" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- red X badge on back photo -->
+  <circle cx="406" cy="66" r="38" fill="#c0392b"/>
+  <line x1="388" y1="48" x2="424" y2="84" stroke="white" stroke-width="7.5" stroke-linecap="round"/>
+  <line x1="424" y1="48" x2="388" y2="84" stroke="white" stroke-width="7.5" stroke-linecap="round"/>
+
+  <!-- front photo (keeper) — offset down-left, clean -->
+  <rect x="72" y="192" width="260" height="210" rx="18" fill="#2176ae"/>
+  <rect x="88" y="208" width="228" height="140" rx="8" fill="#1a5f8a"/>
+  <circle cx="118" cy="244" r="22" fill="#f0c040"/>
+  <path d="M98 336 Q136 308 176 322 Q206 334 248 310" fill="none" stroke="#7dd4fc" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- dedup label bar -->
+  <rect x="80" y="428" width="240" height="52" rx="10" fill="#c0392b"/>
+  <text x="200" y="465" font-family="sans-serif" font-size="34" font-weight="700"
+        fill="white" text-anchor="middle" letter-spacing="4">dedup</text>
+
+</svg>

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Grok Dedup
+Comment=Find and remove duplicate images and videos
+Exec=/home/jlc/bin/grok-dedup-launch.sh
+Icon=grok-dedup
+Terminal=false
+Categories=Utility;Graphics;
+Keywords=duplicate;dedup;images;video;cleanup;
