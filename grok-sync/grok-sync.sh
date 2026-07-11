@@ -21,7 +21,7 @@ printf 'Deduplicate %s first? [y/N] ' "$DOWNLOADS_DIR"
 read -r dedup_answer </dev/tty
 if [[ "${dedup_answer,,}" == "y" ]]; then
     log "Running grok-dedup on $DOWNLOADS_DIR …"
-    dedup_stats="$(grok-dedup.sh "$DOWNLOADS_DIR" --force-delete 2>&1 | tee /dev/stderr | grep '^Done')"
+    dedup_stats="$(grok-dedup.sh "$DOWNLOADS_DIR" --force-delete 2>&1 | tee /dev/stderr | grep '^Done' || true)"
     log "Dedup result: ${dedup_stats:-no duplicates found}"
 fi
 
