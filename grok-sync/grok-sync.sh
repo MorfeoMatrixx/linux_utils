@@ -17,9 +17,9 @@ log() { printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG_FILE"; }
 log "=== Starting grok-sync ==="
 
 # 0. Optionally deduplicate ~/Pictures/Grok before moving new files in
-printf 'Deduplicate %s first? [y/N] ' "$DOWNLOADS_DIR"
+printf 'Deduplicate %s first? [Y/n] ' "$DOWNLOADS_DIR"
 read -r dedup_answer </dev/tty
-if [[ "${dedup_answer,,}" == "y" ]]; then
+if [[ -z "$dedup_answer" || "${dedup_answer,,}" == "y" ]]; then
     log "Running grok-dedup on $DOWNLOADS_DIR …"
     dedup_stats="$(grok-dedup.sh "$DOWNLOADS_DIR" --force-delete 2>&1 | tee /dev/stderr | grep '^Done' || true)"
     log "Dedup result: ${dedup_stats:-no duplicates found}"
@@ -72,9 +72,9 @@ if [ ${#skipped[@]} -gt 0 ]; then
         log "Skipped ${#skipped[@]} files already in $LOCAL_GROK_DIR (too many to list)"
     fi
 
-    printf '\nDelete %d skipped file(s) from Downloads? [y/N] ' "${#skipped[@]}"
+    printf '\nDelete %d skipped file(s) from Downloads? [Y/n] ' "${#skipped[@]}"
     read -r answer </dev/tty
-    if [[ "${answer,,}" == "y" ]]; then
+    if [[ -z "$answer" || "${answer,,}" == "y" ]]; then
         for f in "${skipped[@]}"; do
             rm -- "$f" && log "Deleted: $(basename "$f")"
         done
