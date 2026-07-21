@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+
+  <defs>
+    <clipPath id="rounded">
+      <rect width="256" height="256" rx="40"/>
+    </clipPath>
+  </defs>
+
+  <!-- background -->
+  <rect width="256" height="256" rx="40" fill="#0c0f0c"/>
+
+  <!-- faint horizontal scanlines, terminal-style -->
+  <g clip-path="url(#rounded)" stroke="#22ff66" stroke-width="1" opacity="0.06">
+    <path d="M0 8H256 M0 16H256 M0 24H256 M0 32H256 M0 40H256 M0 48H256 M0 56H256
+             M0 64H256 M0 72H256 M0 80H256 M0 88H256 M0 96H256 M0 104H256 M0 112H256
+             M0 120H256 M0 128H256 M0 136H256 M0 144H256 M0 152H256 M0 160H256
+             M0 168H256 M0 176H256 M0 184H256 M0 192H256 M0 200H256 M0 208H256
+             M0 216H256 M0 224H256 M0 232H256 M0 240H256 M0 248H256"/>
+  </g>
+
+  <!-- neon circle -->
+  <circle cx="128" cy="100" r="58" fill="#0a1f10" stroke="#22ff66" stroke-width="6"/>
+
+  <!-- sync (refresh) glyph, adapted from Feather "refresh-cw" -->
+  <g transform="translate(100.4,72.4) scale(2.3)" fill="none" stroke="#22ff66"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="23 4 23 10 17 10"/>
+    <polyline points="1 20 1 14 7 14"/>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
+    <path d="M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+  </g>
+
+  <!-- title -->
+  <text x="128" y="182" font-family="sans-serif" font-size="27" font-weight="700"
+        fill="#22ff66" text-anchor="middle" letter-spacing="2">LINUX SYNC</text>
+
+  <!-- subtitle -->
+  <text x="128" y="206" font-family="sans-serif" font-size="13" font-weight="700"
+        fill="#22ff66" text-anchor="middle" letter-spacing="2">&#9656; NAS BACKUP &#9666;</text>
+
+</svg>

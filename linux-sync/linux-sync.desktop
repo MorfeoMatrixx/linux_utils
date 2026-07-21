@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Linux Sync
+Comment=Backup ~/Linux_RPi to the WD NAS share
+Exec=/home/jlc/bin/linux-sync-launch.sh
+Icon=linux-sync
+Terminal=false
+Categories=Utility;
+Keywords=sync;nas;backup;rpi;rsync;
