@@ -104,6 +104,8 @@ mkdir -p "$NAS_DEST"
 #    --no-compress  skip zlib compression (images/video are already compressed;
 #                   compressing them again just burns CPU for no size benefit)
 #    --partial      keep partial transfers so a big interrupted video can resume
+#    --bwlimit      cap throughput; this NAS is old enough that unthrottled
+#                   writes can make it stall/time out mid-transfer
 log "Syncing $LOCAL_GROK_DIR -> $NAS_DEST"
 # Add --min-size=100k below if you also want to skip tiny/incomplete files.
 rsync -rt \
@@ -111,6 +113,7 @@ rsync -rt \
     --whole-file \
     --no-compress \
     --partial \
+    --bwlimit=15m \
     --human-readable \
     --info=progress2 \
     --stats \
