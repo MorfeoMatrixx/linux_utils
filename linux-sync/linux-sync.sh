@@ -48,7 +48,14 @@ fi
 mkdir -p "$NAS_DEST"
 
 # rsync local -> NAS, tuned for a fast LAN:
-#   -a             archive mode: preserves perms, times, symlinks, etc.
+#   -rltgoD        archive mode (-a) minus -p: the NAS's NFS export doesn't
+#                  map our UID to the owner of pre-existing/newly-created
+#                  dirs, so setting a directory's mtime or permissions gets
+#                  rejected with "Operation not permitted". --omit-dir-times
+#                  covers the mtime half; there's no equivalent flag for
+#                  perms, so -p is dropped entirely (files get default
+#                  permissions on the NAS instead of an exact copy of the
+#                  source mode bits — fine for a passive backup target)
 #   --whole-file   skip the delta-transfer algorithm (its checksumming costs
 #                  more CPU than just resending the file over a fast LAN)
 #   --no-compress  skip zlib compression (LAN bandwidth is cheap; compressing
@@ -60,7 +67,8 @@ mkdir -p "$NAS_DEST"
 #                  (e.g. scratch/staging dirs like "#Other_OS_Images")
 # No --delete: this is an additive backup, files removed locally stay on the NAS.
 log "Syncing $SRC_DIR -> $NAS_DEST"
-rsync -a \
+rsync -rltgoD \
+    --omit-dir-times \
     --whole-file \
     --no-compress \
     --partial \
