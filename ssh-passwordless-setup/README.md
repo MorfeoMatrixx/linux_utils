@@ -67,6 +67,24 @@ If `ssh` gives "Connection refused" on the expected port, the add-on
 either isn't started or is configured on a different port — check
 Settings → Add-ons → Advanced SSH & Web Terminal → Log/Configuration.
 
+## Troubleshooting
+
+**`sudo: unable to resolve host <hostname>`** — harmless warning but
+annoying. The remote machine can't resolve its own hostname. Fix on the
+remote:
+
+```bash
+echo "127.0.1.1 $(hostname)" | sudo tee -a /etc/hosts
+```
+
+**Key auth ignored, falls back to password on first login** — usually wrong
+permissions on `~/.ssh/authorized_keys` on the remote (`sshd` silently
+rejects loose permissions). Fix on the remote:
+
+```bash
+chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
+```
+
 ## Current host entries (this machine)
 
 See `~/.ssh/config`:
@@ -75,3 +93,4 @@ See `~/.ssh/config`:
 - `rpi3havsat2` → `jlc@rpi3havsat2.local`
 - `homeassistant` → `root@homeassistant.local:22` (via Advanced SSH & Web
   Terminal add-on)
+- `uconsole` → `uconsole.local` (had `sudo` hostname fix applied)
