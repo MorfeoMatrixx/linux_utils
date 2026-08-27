@@ -2,6 +2,9 @@
 
 How to set up key-based SSH login to avoid typing a password every time.
 
+Steps 2 and 3 below are automated by `ssh-node-setup.sh` — see
+[USAGE.md](USAGE.md) for how to run it.
+
 ## 1. Generate a key pair (once per machine)
 
 ```bash
