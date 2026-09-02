@@ -25,15 +25,38 @@ writes into `/home/pi/wdnas1/backup/pidp-11_backup/<timestamp>/` on the NAS.
 
 ## Restore (after a fresh RPiOS Desktop install)
 
+Redo the [smb-user-mount](../smb-user-mount) setup first so
+`/home/pi/wdnas1` is mounted, then:
+
 ```bash
-sudo tar -C / -xzf pidp-11_userdata_<ts>.tar.gz
-apt install $(cat pidp-11_packages_<ts>.txt)
+~/bin/pidp11-node-restore.sh          # picks the most recent backup
+~/bin/pidp11-node-restore.sh 20260901_2040   # or a specific one
 ```
 
-Then extract `pidp-11_etc-boot_reference_<ts>.tar.gz` somewhere and diff it
-against the fresh `/etc` and `/boot/config.txt` by hand, pulling over only
-what's actually needed (e.g. the `spi=off`/`hdmi_force_mode`/`gpu_mem=256`
-lines in `config.txt` for the PiDP-11 front panel hardware).
+It handles `home/pi` + `usr/local` directly (safe, pure user content), and
+reinstalls the manually-tracked packages one at a time (failures — renamed/
+removed packages on the new OS version — are logged, not fatal).
+
+`/etc` gets special handling, since blanket-restoring it would bring back
+the *old* install's SSH host keys, `shadow`/`passwd`, `sudoers`, etc. on top
+of a fresh install that already generated its own:
+
+- Extracted to a staging dir only, never applied directly.
+- `/boot/config.txt` is auto-applied — it's pure hardware config (the
+  PiDP-11 front panel's `spi=off`/`hdmi_force_mode`/`gpu_mem=256` overlay
+  settings), no security content. The fresh install's original is saved
+  as `/boot/config.txt.fresh-orig` first.
+- `/boot/cmdline.txt` is deliberately **not** auto-applied even though it's
+  in the archive — it contains `root=PARTUUID=...` pointing at the *old*
+  install's partition. Copying it verbatim onto a fresh install would
+  point root at a partition that no longer exists and the node would fail
+  to boot. Only pull specific settings from it by hand, never the `root=`
+  line.
+- Everything else in `/etc`: prints a diff summary of files that actually
+  differ from the fresh install, with known security-sensitive paths
+  (`shadow`, `sudoers`, SSH host keys, `ssl/private`, ...) excluded from
+  the list entirely — review what's left and copy over only what you
+  recognize as a real customization, by hand.
 
 ## Notes
 
