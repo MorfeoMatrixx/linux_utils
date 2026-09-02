@@ -22,6 +22,11 @@ IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 if [ -z "$IP" ]; then
     IP=$(ip -4 addr show scope global 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -1)
 fi
+if [ -z "$IP" ]; then
+    # no iproute2 (e.g. TinyCore/busybox): fall back to ifconfig
+    IP=$(ifconfig 2>/dev/null | grep -oE 'inet (addr:)?[0-9]{1,3}(\.[0-9]{1,3}){3}' \
+        | grep -v '127\.0\.0\.1' | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | head -1)
+fi
 MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null)
 if [ -n "$MODEL" ]; then
     # "Raspberry Pi 3 Model B Plus Rev 1.3" -> "RPi 3B+ R1.3"
@@ -44,6 +49,11 @@ RAM=$(free -h 2>/dev/null | awk '/^Mem:/{print $2}')
 [ -z "$RAM" ] && RAM=$(awk '/MemTotal/{printf "%.1fG", $2/1024/1024}' /proc/meminfo 2>/dev/null)
 STORAGE=$(df -h / 2>/dev/null | awk 'NR==2{print $2"B ("$5"U)"}')
 IFACE=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="dev") print $(i+1)}' | head -1)
+if [ -z "$IFACE" ]; then
+    # no iproute2: default route's interface is the first column of the
+    # /proc/net/route entry whose destination is 00000000
+    IFACE=$(awk '$2 == "00000000" {print $1; exit}' /proc/net/route 2>/dev/null)
+fi
 CONN="unknown"
 if [ -n "$IFACE" ]; then
     if [ -d "/sys/class/net/$IFACE/wireless" ]; then
