@@ -112,9 +112,15 @@ echo "Querying ${#HOSTS[@]} host(s) from $SSH_CONFIG ..."
 for host in "${HOSTS[@]}"; do
     (
         out=$(timeout "$((SSH_TIMEOUT + 4))" ssh -o BatchMode=yes -o ConnectTimeout="$SSH_TIMEOUT" \
-            -o StrictHostKeyChecking=accept-new "$host" "$REMOTE_PROBE" </dev/null 2>/dev/null)
+            -o StrictHostKeyChecking=accept-new "$host" "$REMOTE_PROBE" </dev/null 2>"$TMPDIR/$host.err")
         if [ -z "$out" ]; then
-            echo "UNREACHABLE=1" > "$TMPDIR/$host"
+            reason="unreachable"
+            if grep -qi 'Permission denied' "$TMPDIR/$host.err"; then
+                reason="auth failed"
+            elif grep -qi 'Could not resolve hostname' "$TMPDIR/$host.err"; then
+                reason="DNS miss"
+            fi
+            echo "UNREACHABLE=$reason" > "$TMPDIR/$host"
         else
             echo "$out" > "$TMPDIR/$host"
         fi
@@ -128,8 +134,10 @@ LABELS=("IP" "Model/CPU" "RAM" "Storage" "Connection" "OS" "Uptime")
 
 for host in "${HOSTS[@]}"; do
     file="$TMPDIR/$host"
-    if grep -q '^UNREACHABLE=1' "$file" 2>/dev/null; then
-        DATA["$host,IP"]="(unreachable)"
+    if grep -q '^UNREACHABLE=' "$file" 2>/dev/null; then
+        reason=$(sed -n 's/^UNREACHABLE=//p' "$file")
+        DATA["$host,UNREACHABLE"]=1
+        DATA["$host,IP"]="($reason)"
         for f in "${FIELDS[@]}"; do
             [ "$f" = "IP" ] && continue
             DATA["$host,$f"]=""
@@ -222,7 +230,7 @@ hborder "├" "┼" "┤"
 shadow_line
 
 for host in "${HOSTS[@]}"; do
-    if [ "${DATA["$host,IP"]}" = "(unreachable)" ]; then
+    if [ -n "${DATA["$host,UNREACHABLE"]:-}" ]; then
         printf "%s%s%s" "$RESET" "$GREEN" "$DIM"
     else
         printf "%s%s" "$RESET" "$GREEN"
