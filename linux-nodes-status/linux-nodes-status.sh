@@ -48,6 +48,12 @@ fi
 RAM=$(free -h 2>/dev/null | awk '/^Mem:/{print $2}')
 [ -z "$RAM" ] && RAM=$(awk '/MemTotal/{printf "%.1fG", $2/1024/1024}' /proc/meminfo 2>/dev/null)
 STORAGE=$(df -h / 2>/dev/null | awk 'NR==2{print $2"B ("$5"U)"}')
+if [ "$(awk '$2=="/"{print $3; exit}' /proc/mounts 2>/dev/null)" = "tmpfs" ]; then
+    # root is RAM-backed (e.g. TinyCore/piCorePlayer): report the first real
+    # persistent block-device mount instead of the tmpfs size
+    REAL_FS=$(df -h 2>/dev/null | awk '$1 ~ /^\/dev\// && $6 !~ /^\/tmp\// {print $2, $5; exit}')
+    [ -n "$REAL_FS" ] && STORAGE=$(echo "$REAL_FS" | awk '{print $1"B ("$2"U)"}')
+fi
 IFACE=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="dev") print $(i+1)}' | head -1)
 if [ -z "$IFACE" ]; then
     # no iproute2: default route's interface is the first column of the
@@ -124,11 +130,9 @@ for host in "${HOSTS[@]}"; do
         out=$(timeout "$((SSH_TIMEOUT + 4))" ssh -o BatchMode=yes -o ConnectTimeout="$SSH_TIMEOUT" \
             -o StrictHostKeyChecking=accept-new "$host" "$REMOTE_PROBE" </dev/null 2>"$TMPDIR/$host.err")
         if [ -z "$out" ]; then
-            reason="unreachable"
+            reason="Unreachable"
             if grep -qi 'Permission denied' "$TMPDIR/$host.err"; then
                 reason="auth failed"
-            elif grep -qi 'Could not resolve hostname' "$TMPDIR/$host.err"; then
-                reason="DNS miss"
             fi
             echo "UNREACHABLE=$reason" > "$TMPDIR/$host"
         else
