@@ -49,10 +49,28 @@ RAM=$(free -h 2>/dev/null | awk '/^Mem:/{print $2}')
 [ -z "$RAM" ] && RAM=$(awk '/MemTotal/{printf "%.1fG", $2/1024/1024}' /proc/meminfo 2>/dev/null)
 STORAGE=$(df -h / 2>/dev/null | awk 'NR==2{print $2"B ("$5"U)"}')
 if [ "$(awk '$2=="/"{print $3; exit}' /proc/mounts 2>/dev/null)" = "tmpfs" ]; then
-    # root is RAM-backed (e.g. TinyCore/piCorePlayer): report the first real
-    # persistent block-device mount instead of the tmpfs size
-    REAL_FS=$(df -h 2>/dev/null | awk '$1 ~ /^\/dev\// && $6 !~ /^\/tmp\// {print $2, $5; exit}')
-    [ -n "$REAL_FS" ] && STORAGE=$(echo "$REAL_FS" | awk '{print $1"B ("$2"U)"}')
+    # root is RAM-backed (e.g. TinyCore/piCorePlayer), and the mounted
+    # partitions there are typically a small fixed-size overlay, not the
+    # real card. Read the actual disk capacity straight from sysfs
+    # (/sys/block/<dev>/size, in 512B sectors) - no lsblk/fdisk needed,
+    # and it's usually not even installed on these minimal images.
+    DISK_BYTES=0
+    for s in /sys/block/*/size; do
+        dev=$(basename "$(dirname "$s")")
+        case "$dev" in loop*|ram*|zram*) continue ;; esac
+        sectors=$(cat "$s" 2>/dev/null) || continue
+        # do the multiply in awk, not shell arithmetic: some busybox ash
+        # builds do 32-bit $(( )) and silently overflow past ~2GB (as seen
+        # on rpi0pcp's 8GB card - the shell wrapped it negative)
+        bytes=$(awk -v s="$sectors" 'BEGIN{printf "%.0f", s*512}')
+        [ "$bytes" -gt "$DISK_BYTES" ] && DISK_BYTES=$bytes
+    done
+    if [ "$DISK_BYTES" -gt 0 ]; then
+        STORAGE=$(awk -v b="$DISK_BYTES" 'BEGIN {
+            if (b >= 1073741824) printf "%.1fGB", b/1073741824
+            else printf "%.0fMB", b/1048576
+        }')
+    fi
 fi
 IFACE=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="dev") print $(i+1)}' | head -1)
 if [ -z "$IFACE" ]; then
