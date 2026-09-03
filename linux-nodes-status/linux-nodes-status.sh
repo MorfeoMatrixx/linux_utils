@@ -244,7 +244,7 @@ shadow_line() {
     printf "%s%s%s\n" "$RESET" "$DIM$GREEN" "$(shade "$SHADOW_W")"
 }
 
-printf "%s%s" "$GREEN" "$BOLD"
+printf "%s%s%s" "$RESET" "$GREEN" "$BOLD"
 hborder "┌" "┬" "┐"
 printf "\n"
 
@@ -257,7 +257,7 @@ done
 printf " │"
 shadow_line
 
-printf "%s%s" "$GREEN" "$BOLD"
+printf "%s%s%s" "$RESET" "$GREEN" "$BOLD"
 hborder "├" "┼" "┤"
 shadow_line
 
@@ -278,7 +278,7 @@ for host in "${HOSTS[@]}"; do
     shadow_line
 done
 
-printf "%s%s" "$GREEN" "$BOLD"
+printf "%s%s%s" "$RESET" "$GREEN" "$BOLD"
 hborder "└" "┴" "┘"
 shadow_line
 
