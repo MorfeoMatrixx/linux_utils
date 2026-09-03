@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RUN_CMD="${SCRIPT_DIR}/grok-sync.sh; echo; read -p 'Done — press Enter to close'"
+RUN_CMD="${SCRIPT_DIR}/grok-sync.sh ${*}; echo; read -p 'Done — press Enter to close'"
 
 if command -v tilix &>/dev/null; then
     exec tilix -e bash -c "$RUN_CMD"

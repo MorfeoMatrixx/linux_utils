@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Moves Grok downloads into ~/Pictures/Grok, then rsyncs them to the WD NAS share.
+# Usage: grok-sync.sh [--batch]
+#   --batch  skip all prompts, assume yes to dedup and delete-skipped
 # Requires the NAS automount to be set up first — see setup-nas-mount.sh.
 set -euo pipefail
+
+BATCH=false
+[[ "${1:-}" == "--batch" ]] && BATCH=true
 
 DOWNLOADS_DIR="$HOME/Downloads"
 LOCAL_GROK_DIR="$HOME/Pictures/Grok"
@@ -17,8 +22,12 @@ log() { printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG_FILE"; }
 log "=== Starting grok-sync ==="
 
 # 0. Optionally deduplicate ~/Pictures/Grok before moving new files in
-printf 'Deduplicate %s first? [Y/n] ' "$DOWNLOADS_DIR"
-read -r dedup_answer </dev/tty
+if ! $BATCH; then
+    printf 'Deduplicate %s first? [Y/n] ' "$DOWNLOADS_DIR"
+    read -r dedup_answer </dev/tty
+else
+    dedup_answer=""
+fi
 if [[ -z "$dedup_answer" || "${dedup_answer,,}" == "y" ]]; then
     log "Running grok-dedup on $DOWNLOADS_DIR …"
     dedup_stats="$(grok-dedup.sh "$DOWNLOADS_DIR" --force-delete 2>&1 | tee /dev/stderr | grep '^Done' || true)"
@@ -72,8 +81,12 @@ if [ ${#skipped[@]} -gt 0 ]; then
         log "Skipped ${#skipped[@]} files already in $LOCAL_GROK_DIR (too many to list)"
     fi
 
-    printf '\nDelete %d skipped file(s) from Downloads? [Y/n] ' "${#skipped[@]}"
-    read -r answer </dev/tty
+    if ! $BATCH; then
+        printf '\nDelete %d skipped file(s) from Downloads? [Y/n] ' "${#skipped[@]}"
+        read -r answer </dev/tty
+    else
+        answer=""
+    fi
     if [[ -z "$answer" || "${answer,,}" == "y" ]]; then
         for f in "${skipped[@]}"; do
             rm -- "$f" && log "Deleted: $(basename "$f")"
