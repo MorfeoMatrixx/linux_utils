@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=GPU Mode
+Comment=Switch GPU graphics mode and CPU power profile
+Exec=/home/jlc/.local/bin/gpu-mode
+Icon=gpu-mode
+Terminal=false
+Categories=System;Settings;Utility;
+StartupNotify=true

@@ -1,0 +1,99 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="boardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0d2818"/>
+      <stop offset="100%" stop-color="#051208"/>
+    </linearGradient>
+    <linearGradient id="chipGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#003d1a"/>
+      <stop offset="100%" stop-color="#001a0a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#39ff7a" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#39ff7a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="256" height="256" rx="40" fill="#000000"/>
+  <rect width="256" height="256" rx="40" fill="url(#glow)"/>
+
+  <!-- GPU card body -->
+  <rect x="28" y="64" width="200" height="128" rx="10"
+        fill="url(#boardGrad)" stroke="#39ff7a" stroke-width="3"/>
+
+  <!-- main die / chip -->
+  <rect x="56" y="86" width="104" height="84" rx="4"
+        fill="url(#chipGrad)" stroke="#39ff7a" stroke-width="2.5"/>
+
+  <!-- die inner core -->
+  <rect x="76" y="106" width="64" height="44" rx="2"
+        fill="#000000" stroke="#39ff7a" stroke-width="1.5"/>
+
+  <!-- core grid lines -->
+  <g stroke="#39ff7a" stroke-width="1" opacity="0.7">
+    <line x1="92" y1="106" x2="92" y2="150"/>
+    <line x1="108" y1="106" x2="108" y2="150"/>
+    <line x1="124" y1="106" x2="124" y2="150"/>
+    <line x1="76" y1="120" x2="140" y2="120"/>
+    <line x1="76" y1="136" x2="140" y2="136"/>
+  </g>
+
+  <!-- chip pins, top -->
+  <g stroke="#39ff7a" stroke-width="2.5">
+    <line x1="68" y1="86" x2="68" y2="74"/>
+    <line x1="82" y1="86" x2="82" y2="74"/>
+    <line x1="96" y1="86" x2="96" y2="74"/>
+    <line x1="110" y1="86" x2="110" y2="74"/>
+    <line x1="124" y1="86" x2="124" y2="74"/>
+    <line x1="138" y1="86" x2="138" y2="74"/>
+    <line x1="152" y1="86" x2="152" y2="74"/>
+  </g>
+  <!-- chip pins, bottom -->
+  <g stroke="#39ff7a" stroke-width="2.5">
+    <line x1="68" y1="170" x2="68" y2="182"/>
+    <line x1="82" y1="170" x2="82" y2="182"/>
+    <line x1="96" y1="170" x2="96" y2="182"/>
+    <line x1="110" y1="170" x2="110" y2="182"/>
+    <line x1="124" y1="170" x2="124" y2="182"/>
+    <line x1="138" y1="170" x2="138" y2="182"/>
+    <line x1="152" y1="170" x2="152" y2="182"/>
+  </g>
+
+  <!-- fan 1 -->
+  <circle cx="190" cy="108" r="22" fill="#001a0a" stroke="#39ff7a" stroke-width="2.5"/>
+  <circle cx="190" cy="108" r="4" fill="#39ff7a"/>
+  <g stroke="#39ff7a" stroke-width="2" stroke-linecap="round">
+    <path d="M 190 108 L 190 90" />
+    <path d="M 190 108 L 205 117" />
+    <path d="M 190 108 L 205 99" />
+    <path d="M 190 108 L 175 117" />
+    <path d="M 190 108 L 175 99" />
+    <path d="M 190 108 L 190 126" />
+  </g>
+
+  <!-- fan 2 -->
+  <circle cx="190" cy="156" r="22" fill="#001a0a" stroke="#39ff7a" stroke-width="2.5"/>
+  <circle cx="190" cy="156" r="4" fill="#39ff7a"/>
+  <g stroke="#39ff7a" stroke-width="2" stroke-linecap="round">
+    <path d="M 190 156 L 190 138" />
+    <path d="M 190 156 L 205 165" />
+    <path d="M 190 156 L 205 147" />
+    <path d="M 190 156 L 175 165" />
+    <path d="M 190 156 L 175 147" />
+    <path d="M 190 156 L 190 174" />
+  </g>
+
+  <!-- I/O bracket slots, left edge -->
+  <g fill="#39ff7a">
+    <rect x="18" y="80" width="10" height="6" rx="1"/>
+    <rect x="18" y="92" width="10" height="6" rx="1"/>
+    <rect x="18" y="104" width="10" height="6" rx="1"/>
+  </g>
+
+  <!-- power connector notch, top edge -->
+  <rect x="140" y="58" width="28" height="10" rx="2" fill="#39ff7a"/>
+
+  <!-- subtle scanline accent at bottom (nods to the terminal theme) -->
+  <rect x="28" y="186" width="200" height="2" fill="#39ff7a" opacity="0.5"/>
+</svg>
