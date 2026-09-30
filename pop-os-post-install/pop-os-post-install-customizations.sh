@@ -111,7 +111,10 @@ sec_repos() {
 APT_PKGS=(
     # Desktop: Plasma alongside Cosmic
     kde-plasma-desktop sddm dolphin dolphin-plugins kio-extras breeze-gtk-theme
-    kate kwrite okular okular-extra-backends kdeconnect
+    kate kwrite okular okular-extra-backends kdeconnect kcalc
+    # KDE utilities (Spectacle registers PrtScr itself at the next Plasma login)
+    kde-spectacle ark filelight krename kcolorchooser kcharselect ksystemlog kdiff3 krdc
+    print-manager plasma-widgets-addons gwenview skanlite kio-gdrive
     # Terminal, editors, viewers
     tilix geany geany-plugins thonny gthumb vlc mpv
     # NAS / network

@@ -30,7 +30,7 @@ On this laptop, **Plasma X11 does not recover the HDMI monitor after suspend** u
 | Section | What it covers |
 |---|---|
 | `repos` | GitHub CLI and Claude Desktop apt repositories (the Claude signing key is in `assets/`) |
-| `apt` | KDE Plasma 5.27 with **sddm** preselected as display manager (Cosmic stays installed and selectable), Google Chrome (Google's `.deb`), Claude Desktop, and all apt apps: Tilix, KWrite/Kate, Okular, gThumb, VLC/mpv, Geany, Thonny, NAS/network tools, dev tools, GPU tools, media codecs, OCR, and the tools our utilities need (`dialog`, `pv`, `xdotool` and so on) |
+| `apt` | KDE Plasma 5.27 with **sddm** preselected as display manager (Cosmic stays installed and selectable), Google Chrome (Google's `.deb`), Claude Desktop, KDE utilities (Spectacle on PrtScr, KCalc, Ark, Filelight, KRename, KColorChooser, KCharSelect, KSystemLog, KDiff3, KRDC, print manager, Plasma widget add-ons, Gwenview, Skanlite, kio-gdrive), and all apt apps: Tilix, KWrite/Kate, Okular, gThumb, VLC/mpv, Geany, Thonny, NAS/network tools, dev tools, GPU tools, media codecs, OCR, and the tools our utilities need (`dialog`, `pv`, `xdotool` and so on) |
 | `flatpak` | MarkText, OrcaSlicer, PhotoCollage, Decoder, Angry IP Scanner, qBittorrent, NetPeek (from Flathub), and cosmic-ext-connected (from the Cosmic Flatpak repo) |
 | `extras` | fastfetch (latest `.deb`), yscan (`cargo`), crontab-ui (`npm` + user service), Claude Code (official installer). Reminds you about FlashForgeUI and Flash Studio, which have no stable download URL |
 | `system` | **The NVIDIA suspend/wake fix** (above), the `spd5118` kernel-module blacklist (fixes a suspend crash on the LOQ), NAS CIFS automounts in `/etc/fstab` plus the credentials file (prompted), `/etc/hosts` pins for the NAS and pidp-11, a sudoers rule so `system76-power` runs without a password, and the `/etc/profile.d/vte.sh` link for Tilix. Passwordless sudo is **opt-in** (`--nopasswd-sudo`) |
@@ -122,6 +122,7 @@ At the **sddm** login screen, open the session menu and choose **"Plasma"**. **N
 - **NAS:** open `wdnas_public` in Dolphin's sidebar. It should mount on first access.
 - **Window focus:** click between two windows. The focused one has a purple title bar and border.
 - **Default apps:** double-click a `.sh`, a `.md` and a `.pdf`. They should open in KWrite, MarkText and Okular.
+- **Screenshots:** press PrtScr and Spectacle opens (Meta+Shift+PrtScr goes straight to region selection).
 - **Whole setup:** `./pop-os-post-install-customizations.sh --check` should show `OK` everywhere and exit 0.
 
 ### 9. Manual follow-ups
