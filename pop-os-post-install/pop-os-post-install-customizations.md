@@ -36,7 +36,7 @@ On this laptop, **Plasma X11 does not recover the HDMI monitor after suspend** u
 | `system` | **The NVIDIA suspend/wake fix** (above), the `spd5118` kernel-module blacklist (fixes a suspend crash on the LOQ), NAS CIFS automounts in `/etc/fstab` plus the credentials file (prompted), `/etc/hosts` pins for the NAS and pidp-11, a sudoers rule so `system76-power` runs without a password, and the `/etc/profile.d/vte.sh` link for Tilix. Passwordless sudo is **opt-in** (`--nopasswd-sudo`) |
 | `utils` | Clones this repo if needed and installs our utilities: `dir-backup.sh`, `sd-backup.sh`, grok-sync, grok-dedup, linux-sync, `linux-nodes-status.sh`, `ssh-node-setup.sh`, lanscan, gpu-mode, `set-default-apps.sh`, `plasma-suspend-fix-redo.sh`, plus their icons and app-menu launchers |
 | `dotfiles` | The `JLC CUSTOMIZATIONS` block in `~/.bashrc` (PATH, the Tilix fix, the hybrid-GPU video fix, crontab-ui's database path), git identity, `gh auth login` |
-| `plasma` | **Only inside a Plasma session.** Tilix as the default terminal with Ctrl+Alt+T, Tilix using the normal window frame, double-click to open, Breeze window decoration with a 4 px border, the `cosmic-jlc` colour scheme (purple title bar and border on the focused window with black title text; dark on the others), default apps (KWrite for text and code, MarkText for `.md`, Okular for PDF, Dolphin for folders), and NAS bookmarks in Dolphin's sidebar |
+| `plasma` | **Only inside a Plasma session.** Tilix as the default terminal with Ctrl+Alt+T, **PrtScr = select a region, auto-saved to `~/Documents` without opening Spectacle's window** (Spectacle's other shortcuts stay: Shift/Meta+PrtScr), Tilix using the normal window frame, double-click to open, Breeze window decoration with a 4 px border, the `cosmic-jlc` colour scheme (purple title bar and border on the focused window with black title text; dark on the others), default apps (KWrite for text and code, MarkText for `.md`, Okular for PDF, Dolphin for folders), and NAS bookmarks in Dolphin's sidebar |
 
 **Assets** (`pop-os-post-install/assets/`):
 - `cosmic-jlc.colors`: the colour scheme
@@ -122,7 +122,7 @@ At the **sddm** login screen, open the session menu and choose **"Plasma"**. **N
 - **NAS:** open `wdnas_public` in Dolphin's sidebar. It should mount on first access.
 - **Window focus:** click between two windows. The focused one has a purple title bar and border.
 - **Default apps:** double-click a `.sh`, a `.md` and a `.pdf`. They should open in KWrite, MarkText and Okular.
-- **Screenshots:** press PrtScr and Spectacle opens (Meta+Shift+PrtScr goes straight to region selection).
+- **Screenshots:** press PrtScr, drag a region, and a `Screenshot_<date>.png` appears in `~/Documents` (Esc cancels). To open the full Spectacle window, start it from the app menu.
 - **Whole setup:** `./pop-os-post-install-customizations.sh --check` should show `OK` everywhere and exit 0.
 
 ### 9. Manual follow-ups

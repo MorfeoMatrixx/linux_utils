@@ -70,7 +70,7 @@ ${BOLD}Sections${RESET} (run in this order)
   utils     clone linux_utils to ~/claude/utils and install our utilities + launchers
   dotfiles  ~/.bashrc block, git identity, gh login
   plasma    ${BOLD}run from inside a Plasma (X11) session${RESET}: Tilix default + Ctrl+Alt+T,
-            double-click, Breeze + cosmic-jlc purple focus frame, default apps, NAS bookmarks
+            PrtScr = region screenshot auto-saved to ~/Documents, double-click, Breeze + cosmic-jlc purple focus frame, default apps, NAS bookmarks
 
 ${BOLD}Fresh-install order${RESET}
   1. From Cosmic: run all sections (plasma is skipped outside Plasma), then reboot.
@@ -374,6 +374,29 @@ sec_plasma() {
             kwriteconfig5 --file kglobalshortcutsrc --group org.kde.konsole.desktop --key _launch 'none,Ctrl+Alt+T,Konsole'
             kwriteconfig5 --file kglobalshortcutsrc --group com.gexperts.Tilix.desktop --key _k_friendly_name Tilix
             kwriteconfig5 --file kglobalshortcutsrc --group com.gexperts.Tilix.desktop --key _launch 'Ctrl+Alt+T,none,Tilix'
+            systemctl --user start plasma-kglobalaccel.service"
+    fi
+    # PrtScr -> Spectacle region capture, auto-saved to ~/Documents, no Spectacle window.
+    # Note: this Spectacle (23.08) reads defaultSaveLocation from [Save], not [General].
+    kset spectaclerc Save defaultSaveLocation "file://$HOME/Documents/"
+    local tmp; tmp=$(mktemp); cat > "$tmp" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Screenshot region to Documents
+Comment=Select a region; Spectacle saves it to ~/Documents without opening its window
+Exec=spectacle --background --region
+Icon=spectacle
+NoDisplay=true
+StartupNotify=false
+EOF
+    inst "$tmp" "$HOME/.local/share/applications/net.local.spectacle-region.desktop"; rm -f "$tmp"
+    if [[ $(kreadconfig5 --file kglobalshortcutsrc --group net.local.spectacle-region.desktop --key _launch) == Print,* ]]; then ok "PrtScr -> region screenshot to ~/Documents"; else
+        act "PrtScr -> region screenshot to ~/Documents (Spectacle launch unbound)" bash -c "$(declare -f bk); BK='$BK'; bk '$HOME/.config/kglobalshortcutsrc'
+            kbuildsycoca5 >/dev/null 2>&1 || true
+            systemctl --user stop plasma-kglobalaccel.service
+            kwriteconfig5 --file kglobalshortcutsrc --group org.kde.spectacle.desktop --key _launch 'none,Print,Launch Spectacle'
+            kwriteconfig5 --file kglobalshortcutsrc --group net.local.spectacle-region.desktop --key _k_friendly_name 'Screenshot region to Documents'
+            kwriteconfig5 --file kglobalshortcutsrc --group net.local.spectacle-region.desktop --key _launch 'Print,none,Screenshot region to Documents'
             systemctl --user start plasma-kglobalaccel.service"
     fi
     # Window decoration: Breeze, 4px border
