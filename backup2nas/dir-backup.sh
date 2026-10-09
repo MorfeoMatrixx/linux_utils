@@ -28,10 +28,18 @@ beep() {
 
 dg() {
     local rc
-    dialog "$@" 3>&1 1>&2 2>&3
-    rc=$?
+    rc=0
+    dialog "$@" 3>&1 1>&2 2>&3 || rc=$?
     clear >/dev/tty
     return $rc
+}
+
+# set -e safe way to call dg: answer in $ANS, exit status in $RC.
+# A bare `X=$(dg ...); rc=$?` kills the whole script on Back (rc 3) before
+# rc is read, because set -e fires on the failed command substitution.
+ask() {
+    RC=0
+    ANS=$(dg "$@") || RC=$?
 }
 
 # Interactive directory browser (dialog --menu based, so the list itself
@@ -47,8 +55,8 @@ browse_dir() {
         for s in "${subdirs[@]}"; do
             menu+=("$s" "")
         done
-        choice=$(dg --title "Browse: $cur" --menu "Select a subdirectory, or choose an action:" 22 78 14 "${menu[@]}")
-        rc=$?
+        rc=0
+        choice=$(dg --title "Browse: $cur" --menu "Select a subdirectory, or choose an action:" 22 78 14 "${menu[@]}") || rc=$?
         if [ $rc -ne 0 ]; then
             return 1
         fi
@@ -74,13 +82,13 @@ select_sources() {
         for s in "${subdirs[@]}"; do
             menu+=("$s" "")
         done
-        choice=$(dg --title "Browse: $cur" --menu "Select a source directory, or choose an action:" 22 78 14 "${menu[@]}")
-        rc=$?
+        rc=0
+        choice=$(dg --title "Browse: $cur" --menu "Select a source directory, or choose an action:" 22 78 14 "${menu[@]}") || rc=$?
         if [ $rc -ne 0 ]; then
             return 1
         fi
         case "$choice" in
-            ".") SRC_DIRS=("$cur"); return 0 ;;
+            ".") SRC_DIRS=("$cur"); SRC_BROWSE="$cur"; return 0 ;;
             "+")
                 if [ ${#subdirs[@]} -eq 0 ]; then
                     dialog --title "No subdirectories" --msgbox "No subdirectories found under:\n$cur" 8 70
@@ -92,8 +100,8 @@ select_sources() {
                     checklist+=("$s" "" off)
                 done
                 local selection
-                selection=$(dg --title "Select multiple" --checklist "Select one or more subdirectories under:\n$cur" 22 78 14 "${checklist[@]}")
-                rc=$?
+                rc=0
+                selection=$(dg --title "Select multiple" --checklist "Select one or more subdirectories under:\n$cur" 22 78 14 "${checklist[@]}") || rc=$?
                 if [ $rc -ne 0 ]; then
                     continue
                 fi
@@ -106,6 +114,7 @@ select_sources() {
                 for s in "${sel_arr[@]}"; do
                     SRC_DIRS+=("$cur/$s")
                 done
+                SRC_BROWSE="$cur"
                 return 0
                 ;;
             "..") cur=$(dirname "$cur") ;;
@@ -120,7 +129,7 @@ while true; do
 case $STEP in
 
 1)  # SELECT SOURCE DIRECTORY(IES)
-    select_sources "${SRC_DIRS[0]:-$HOME}" || { echo "Aborted."; exit 0; }
+    select_sources "${SRC_BROWSE:-$HOME}" || { echo "Aborted."; exit 0; }
 
     NDIRS=${#SRC_DIRS[@]}
     dialog --title "Directory Backup" --infobox "Calculating size of $NDIRS source director$([ "$NDIRS" -eq 1 ] && echo y || echo ies)..." 8 70
@@ -145,9 +154,8 @@ case $STEP in
     )
 
     if [ ${#DESTS[@]} -eq 0 ]; then
-        dg --title "Destination" --extra-button --extra-label "Back" --msgbox "No mounted destinations found under /media/jlc/ or /mnt/wdnas_public/.\n\nYou'll be shown a directory browser next." 10 78
-        rc=$?
-        case $rc in
+        ask --title "Destination" --extra-button --extra-label "Back" --msgbox "No mounted destinations found under /media/jlc/ or /mnt/wdnas_public/.\n\nYou'll be shown a directory browser next." 10 78
+        case $RC in
             3) STEP=1; continue ;;
             0) : ;;
             *) echo "Aborted."; exit 0 ;;
@@ -172,9 +180,9 @@ case $STEP in
         manual_idx=$idx
         MENU_ITEMS+=("$manual_idx" "Browse for a path...")
 
-        CHOICE=$(dg --title "Select destination" --extra-button --extra-label "Back" --menu "Choose a NAS/media destination for the backup:" 20 78 10 "${MENU_ITEMS[@]}")
-        rc=$?
-        case $rc in
+        ask --title "Select destination" --extra-button --extra-label "Back" --menu "Choose a NAS/media destination for the backup:" 20 78 10 "${MENU_ITEMS[@]}"
+        CHOICE=$ANS
+        case $RC in
             3) STEP=1; continue ;;
             0) : ;;
             *) echo "Aborted."; exit 0 ;;
@@ -199,14 +207,13 @@ case $STEP in
     # backups get auto-named per directory, sharing one run timestamp)
     if [ "$NDIRS" -eq 1 ]; then
         DEFAULT_NAME="${OUT_NAME:-backup_$(basename "${SRC_DIRS[0]}")_$(date +%Y%m%d_%H%M).tar.zst}"
-        OUT_NAME=$(dg --title "Output filename" --extra-button --extra-label "Back" --inputbox "Output filename:" 10 78 "$DEFAULT_NAME")
-        rc=$?
-        case $rc in
+        ask --title "Output filename" --extra-button --extra-label "Back" --inputbox "Output filename:" 10 78 "$DEFAULT_NAME"
+        case $RC in
             3) STEP=2; continue ;;
             0) : ;;
             *) echo "Aborted."; exit 0 ;;
         esac
-        OUT_NAME="${OUT_NAME:-$DEFAULT_NAME}"
+        OUT_NAME="${ANS:-$DEFAULT_NAME}"
         OUT_PATHS=("$DEST_DIR/$OUT_NAME")
     else
         TS=$(date +%Y%m%d_%H%M)
@@ -233,12 +240,10 @@ case $STEP in
         CONFIRM_MSG+="\n${#OUT_PATHS[@]} archives will be created (auto-named).\n"
     fi
     CONFIRM_MSG+="\nProceed?"
-    dialog --title "Confirm backup" --extra-button --extra-label "Back" --yesno "$CONFIRM_MSG" $((13+NDIRS)) 78
-    rc=$?
-    clear >/dev/tty
-    case $rc in
+    ask --title "Confirm backup" --extra-button --extra-label "Back" --yesno "$CONFIRM_MSG" $((13+NDIRS)) 78
+    case $RC in
         0) STEP=5 ;;
-        3) STEP=3; continue ;;
+        3) if [ "$NDIRS" -eq 1 ]; then STEP=3; else STEP=2; fi; continue ;;
         *) echo "Aborted."; exit 0 ;;
     esac
     ;;
