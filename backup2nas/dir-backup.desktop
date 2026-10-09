@@ -6,5 +6,6 @@ Comment=Back up a directory to the NAS as a tar.zst archive
 Exec=/home/jlc/bin/dir-backup-launch.sh
 Icon=dir-backup
 Terminal=false
+StartupNotify=true
 Categories=Utility;
 Keywords=backup;nas;tar;zstd;archive;
