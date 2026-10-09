@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Dir Sync
+Comment=Sync a directory to the NAS with rsync (incremental, optional mirror)
+Exec=/home/jlc/bin/dir-sync-launch.sh
+Icon=dir-sync
+Terminal=false
+Categories=Utility;
+Keywords=sync;rsync;nas;mirror;backup;
