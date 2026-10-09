@@ -143,8 +143,9 @@ build_flags() {
 }
 
 SRC_BROWSE="$HOME"
+MODE=sync   # sync | mirror-keep | mirror-purge
 OPT_MIRROR=off
-OPT_TRASH=on
+OPT_TRASH=off
 SYNC_NAME=""
 
 # ---------- Step-based flow, so [Back] can return to the previous screen ----------
@@ -231,18 +232,24 @@ case $STEP in
     STEP=4
     ;;
 
-4)  # OPTIONS
-    ask --title "Sync options" --extra-button --extra-label "Back" --checklist "Toggle with SPACE:" 12 78 2 \
-        mirror "Mirror: delete files at destination that are not in source" "$OPT_MIRROR" \
-        trash  "Mirror only: move deleted files to <dest>/.deleted/<timestamp>/" "$OPT_TRASH"
+4)  # SYNC MODE
+    ask --title "Sync mode" --extra-button --extra-label "Back" --no-tags --radiolist \
+"Choose how the destination is updated:\n\
+\n\
+Sync: copy new and changed files only. Nothing at the destination is deleted.\n\
+Mirror: destination becomes IDENTICAL to the source; files that exist only at the destination are removed. Replaced (older) versions of changed files are never kept." 18 84 3 \
+        sync         "Sync - copy new/changed files, never delete" "$([ "$MODE" = sync ] && echo on || echo off)" \
+        mirror-keep  "Mirror, keep deleted files in <dest>/.deleted/<time>/" "$([ "$MODE" = mirror-keep ] && echo on || echo off)" \
+        mirror-purge "Mirror, NO backup - extras DELETED PERMANENTLY" "$([ "$MODE" = mirror-purge ] && echo on || echo off)"
     case $RC in
         3) if [ "$NDIRS" -eq 1 ]; then STEP=3; else STEP=2; fi; continue ;;
         0) : ;;
         *) echo "Aborted."; exit 0 ;;
     esac
+    MODE="${ANS:-sync}"
     OPT_MIRROR=off; OPT_TRASH=off
-    [[ $ANS == *mirror* ]] && OPT_MIRROR=on
-    [[ $ANS == *trash* ]] && OPT_TRASH=on
+    [ "$MODE" != sync ] && OPT_MIRROR=on
+    [ "$MODE" = mirror-keep ] && OPT_TRASH=on
     STEP=5
     ;;
 
@@ -279,8 +286,11 @@ case $STEP in
         i=$((i+1))
     done
     CONFIRM_MSG+="\nDestination fs: $FS_MODE\n"
-    CONFIRM_MSG+="Mode: $([ "$OPT_MIRROR" = on ] && echo 'MIRROR (deletes extras at destination)' || echo 'update only (never deletes)')\n"
-    [ "$OPT_MIRROR" = on ] && CONFIRM_MSG+="Deleted files moved to .deleted/ (trash): $OPT_TRASH\n"
+    case $MODE in
+        sync)         CONFIRM_MSG+="Mode: SYNC (nothing is deleted)\n" ;;
+        mirror-keep)  CONFIRM_MSG+="Mode: MIRROR: $N_DEL file(s) will be MOVED to .deleted/ (recoverable)\n" ;;
+        mirror-purge) CONFIRM_MSG+="Mode: MIRROR, NO BACKUP: $N_DEL file(s) will be DELETED PERMANENTLY\n" ;;
+    esac
     CONFIRM_MSG+="\nDry run: $N_COPY file(s) to copy/update ($BYTES_H), $N_DEL to delete.\n"
     if [ -s "$WORK/dry.err" ]; then
         CONFIRM_MSG+="(rsync reported warnings in the dry run: see Details)\n"
