@@ -119,6 +119,22 @@ select_sources() {
     done
 }
 
+# dialog --gauge "XXX" protocol: updates the percentage AND the message at
+# once. The message is ONE line; "\n" is passed literally for dialog to expand.
+emit() { printf 'XXX\n%s\n%s\nXXX\n' "$1" "$2"; }
+
+# Sign-of-life while rsync scans (it prints nothing until the file lists are
+# built, which can take minutes over SMB): re-emits the message with an elapsed
+# clock every second until the flag file appears.
+scan_ticker() {
+    local flag="$1" text="$2" t0=$SECONDS e
+    while [ ! -e "$flag" ]; do
+        e=$((SECONDS - t0))
+        emit 0 "$text\\n\\nElapsed: $(printf '%02d:%02d' $((e/60)) $((e%60)))"
+        sleep 1
+    done
+}
+
 # Build the rsync flag set for the current destination (array RSYNC_FLAGS).
 # SMB/NTFS/FAT shares can't hold unix owner/perms (and round mtimes to 2s),
 # so -a would error out or re-copy everything on each run.
@@ -323,28 +339,67 @@ Mirror: destination becomes IDENTICAL to the source; files that exist only at th
         LOG="$WORK/run_$i.log"; ERR="$WORK/err_$i.log"; RCF="$WORK/rc_$i"
         : >"$ERR"
 
-        # pass 1 (trash): move files the mirror would delete into .deleted/<ts>/
-        if [ "$OPT_MIRROR" = on ] && [ "$OPT_TRASH" = on ]; then
-            tflags=("${TRASH_FLAGS[@]/@DST@/$dst}")
-            dialog --title "Directory Sync" --infobox "Moving deleted files to .deleted/ for $LABEL..." 6 70
-            T_RC=0
-            rsync "${tflags[@]}" --stats "$d/" "$dst/" >"$WORK/trash_$i.log" 2>>"$ERR" || T_RC=$?
+        TRASH_ON=0
+        [ "$OPT_MIRROR" = on ] && [ "$OPT_TRASH" = on ] && TRASH_ON=1
+        tflags=("${TRASH_FLAGS[@]/@DST@/$dst}")
+
+        # One gauge for the whole source: trash pass (if any), scan, copy.
+        # Everything in the group runs in a subshell (it feeds the pipe), so
+        # results come back through files in $WORK, not variables. Background
+        # jobs and rsync get </dev/null so none of them touches the tty.
+        {
+          STEPTXT=""
+          if [ "$TRASH_ON" -eq 1 ]; then
+              TF="$WORK/tflag_$i"; rm -f "$TF"
+              scan_ticker "$TF" "$LABEL\\n\\nStep 1 of 2: moving deleted files to .deleted/\\n(scanning destination, no % for this step)" </dev/null &
+              TP=$!
+              T_RC=0
+              rsync "${tflags[@]}" --stats "$d/" "$dst/" >"$WORK/trash_$i.log" 2>>"$ERR" </dev/null || T_RC=$?
+              echo "$T_RC" >"$WORK/trc_$i"
+              touch "$TF"; wait "$TP"
+              STEPTXT="Step 2 of 2: "
+          fi
+
+          FF="$WORK/flag_$i"; rm -f "$FF"
+          scan_ticker "$FF" "$LABEL\\n\\n${STEPTXT}scanning source and destination\\n(can take minutes over SMB; % starts when the scan is done)" </dev/null &
+          TP=$!
+          # rsync's own exit status is parked in a file: it's buried in the
+          # middle of a pipe, so $? / PIPESTATUS won't survive.
+          { SRC_RC=0
+            rsync "${flags[@]}" --info=progress2,name1 --no-inc-recursive --stats "$d/" "$dst/" 2>>"$ERR" </dev/null || SRC_RC=$?
+            echo "$SRC_RC" >"$RCF"
+          } | tee "$LOG" | stdbuf -oL tr '\r' '\n' \
+            | awk -v hdr="$LABEL" -v step="$STEPTXT" -v flag="$FF" '
+                function human(n) {
+                    gsub(",", "", n); n += 0
+                    if (n >= 1073741824) return sprintf("%.2f GiB", n / 1073741824)
+                    if (n >= 1048576)    return sprintf("%.1f MiB", n / 1048576)
+                    if (n >= 1024)       return sprintf("%.0f KiB", n / 1024)
+                    return n " B"
+                }
+                /^$/ { next }
+                /^Number of files/ { stats = 1 }
+                stats { next }
+                /^ *[0-9,.A-Za-z]+ +[0-9]+% / {
+                    if (!started) { started = 1; system("touch " flag) }
+                    pct = $2; sub("%", "", pct)
+                    print "XXX"; print pct
+                    print hdr "\\n\\n" step "copying: " cur "\\n" human($1) " done, " $3 ", " (pct == 100 ? "elapsed " : "ETA ") $4
+                    print "XXX"; fflush(); next
+                }
+                { cur = $0; gsub(/\\/, "/", cur); if (length(cur) > 64) cur = "..." substr(cur, length(cur) - 60) }'
+          touch "$FF"; wait "$TP"
+        } | dialog --title "Syncing" --gauge "$LABEL..." 11 78 0 || true
+        clear >/dev/tty
+
+        if [ "$TRASH_ON" -eq 1 ]; then
+            T_RC=$(cat "$WORK/trc_$i" 2>/dev/null || echo 99)
             if [ "$T_RC" -ne 0 ]; then
                 ALL_OK=0
                 ERR_TEXT+="  $(basename "$d"): trash pass rsync exit $T_RC\n"
             fi
-            TOTAL_DEL=$((TOTAL_DEL + $(grep '^Number of deleted files' "$WORK/trash_$i.log" | awk '{gsub(",","",$5); print $5+0}')))
+            TOTAL_DEL=$((TOTAL_DEL + $(grep '^Number of deleted files' "$WORK/trash_$i.log" 2>/dev/null | awk '{gsub(",","",$5); print $5+0}')))
         fi
-
-        # rsync's own exit status is parked in a file: it's buried in the
-        # middle of a pipe feeding the gauge, so $? / PIPESTATUS won't survive.
-        { SRC_RC=0
-          rsync "${flags[@]}" --info=progress2 --no-inc-recursive --stats "$d/" "$dst/" 2>>"$ERR" || SRC_RC=$?
-          echo "$SRC_RC" >"$RCF"
-        } | tee "$LOG" | stdbuf -oL tr '\r' '\n' \
-          | awk '/^ *[0-9,.A-Za-z]+ +[0-9]+% / { for (k=1;k<=NF;k++) if ($k ~ /%$/) { sub("%","",$k); print $k; fflush(); break } }' \
-          | dialog --title "Syncing" --gauge "Syncing $LABEL..." 8 70 0 || true
-        clear >/dev/tty
 
         SRC_RC=$(cat "$RCF" 2>/dev/null || echo 99)
         if [ "$SRC_RC" -ne 0 ]; then
