@@ -292,7 +292,7 @@ sec_utils() {
     ensure_repo
     [[ -d $REPO/.git ]] || { note "repo not cloned yet - nothing more to check"; return 0; }
     local f
-    for f in backup2nas/dir-backup.sh backup2nas/sd-backup.sh grok-sync/grok-sync.sh grok-sync/grok-sync-launch.sh \
+    for f in backup2nas/dir-backup.sh backup2nas/dir-backup-launch.sh backup2nas/dir-sync.sh backup2nas/dir-sync-launch.sh backup2nas/sd-backup.sh grok-sync/grok-sync.sh grok-sync/grok-sync-launch.sh \
              grok-dedup/grok-dedup.sh grok-dedup/grok-dedup-ui.py grok-dedup/grok-dedup-launch.sh \
              linux-sync/linux-sync.sh linux-sync/linux-sync-launch.sh linux-sync/linux-sync-cron-check.sh \
              linux-sync/linux-sync-status.sh linux-nodes-status/linux-nodes-status.sh ssh-passwordless-setup/ssh-node-setup.sh; do
@@ -310,12 +310,14 @@ sec_utils() {
     # Icons + launchers (repo .desktop files hardcode /home/jlc; rewrite to this $HOME)
     local I=$HOME/.local/share/icons n
     inst "$REPO/grok-sync/grok-sync.png" "$I/grok-sync.png"
+    inst "$REPO/backup2nas/dir-backup.png" "$I/dir-backup.png"
+    inst "$REPO/backup2nas/dir-sync.png" "$I/dir-sync.png"
     inst "$REPO/linux-sync/linux-sync.png" "$I/linux-sync.png"
     inst "$REPO/crontab-ui/crontab-ui-icon.svg" "$I/hicolor/scalable/apps/crontab-ui.svg"
     inst "$REPO/gpu-mode/gpu-mode.svg" "$I/hicolor/scalable/apps/gpu-mode.svg"
     for n in 16 32 48 64 128 256; do inst "$REPO/grok-dedup/icons/grok-dedup-$n.png" "$I/hicolor/${n}x${n}/apps/grok-dedup.png"; done
     local d tmp before=$NEEDED; NEEDED=0
-    for d in grok-sync/grok-sync grok-dedup/grok-dedup linux-sync/linux-sync crontab-ui/crontab-ui gpu-mode/gpu-mode; do
+    for d in backup2nas/dir-backup backup2nas/dir-sync grok-sync/grok-sync grok-dedup/grok-dedup linux-sync/linux-sync crontab-ui/crontab-ui gpu-mode/gpu-mode; do
         tmp=$(mktemp); sed "s|/home/jlc|$HOME|g" "$REPO/$d.desktop" > "$tmp"
         inst "$tmp" "$HOME/.local/share/applications/$(basename "$d").desktop"; rm -f "$tmp"
     done

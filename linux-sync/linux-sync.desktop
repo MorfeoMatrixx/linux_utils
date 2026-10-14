@@ -6,5 +6,6 @@ Comment=Backup ~/Linux_RPi to the WD NAS share
 Exec=/home/jlc/bin/linux-sync-launch.sh
 Icon=linux-sync
 Terminal=false
+StartupNotify=true
 Categories=Utility;
 Keywords=sync;nas;backup;rpi;rsync;

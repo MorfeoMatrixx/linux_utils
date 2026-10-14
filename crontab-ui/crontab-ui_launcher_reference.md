@@ -101,7 +101,7 @@ itself.
 
 ## Desktop launcher
 
-`crontab-ui.desktop` opens Chrome in app mode (`--app=http://localhost:8000`)
+`crontab-ui.desktop` (with `StartupNotify=true`, so KWin brings the window in front of fullscreen apps) opens Chrome in app mode (`--app=http://localhost:8000`)
 pointed at the running instance — no address bar, tabs, or menus, just the
 page in its own window.
 

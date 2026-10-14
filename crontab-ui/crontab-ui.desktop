@@ -6,5 +6,6 @@ Comment=Manage cron jobs via web UI
 Exec=google-chrome --app=http://localhost:8000
 Icon=crontab-ui
 Terminal=false
+StartupNotify=true
 Categories=Utility;
 Keywords=cron;crontab;scheduler;
