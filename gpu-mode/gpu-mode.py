@@ -826,7 +826,7 @@ def _spawn_in_sized_terminal():
     env = os.environ.copy()
     env[_SPAWN_MARKER] = "1"
     try:
-        subprocess.Popen(argv, env=env)
+        proc = subprocess.Popen(argv, env=env)
     except OSError as e:
         # Spawn failed for some reason — fall back to running in place,
         # but tell the user why instead of failing silently.
@@ -835,9 +835,16 @@ def _spawn_in_sized_terminal():
         os.environ[_SPAWN_MARKER] = "1"
         main()
         return
+    # Launched from the app menu (KDE sets DESKTOP_STARTUP_ID / the Wayland
+    # activation token): stay alive until the terminal *client* returns, i.e.
+    # until its window exists. KDE ends the startup-notification sequence when
+    # the launched process exits; if that happens before the window is mapped,
+    # KWin refuses to activate it and it opens behind a fullscreen app.
+    # From a plain shell, keep the old behaviour: exit immediately.
+    if os.environ.get("DESKTOP_STARTUP_ID") or os.environ.get("XDG_ACTIVATION_TOKEN"):
+        proc.wait()
     # Original invocation's job is done — the spawned terminal now owns
-    # the app. Exit immediately so the launching shell gets its prompt
-    # back right away instead of waiting.
+    # the app. Exit so the launching shell gets its prompt back.
     sys.exit(0)
 
 
