@@ -5,6 +5,9 @@ Green-on-black terminal control panel for GPU mode & CPU profile switching.
 """
 
 import curses
+import os
+import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -22,6 +25,7 @@ P_ERR       = 8   # red on black                      — error messages
 P_ACCENT    = 9   # magenta on black, bold            — ACTIVE mode (system state)
 P_MODE      = 10  # white on black                    — available (non-active, non-selected) modes
 P_HELP      = 11  # white on black                    — bottom key-hint line
+P_PENDING   = 12  # red on black                      — pending-reboot mode
 
 # ─── fixed panel dimensions (do not stretch to fill terminal) ─────────────────
 PANEL_W = 40
@@ -118,26 +122,47 @@ def run_cmd(args, sudo=False, timeout=QUERY_TIMEOUT):
     except subprocess.TimeoutExpired:
         return "", f"Command timed out after {timeout}s", 1
 
-def _extract_value(out):
-    """system76-power prints lines like 'Graphics mode: hybrid' or
-    'Profile: balanced' — pull out just the trailing value, lowercased."""
+def _extract_value(out, prefixes):
+    """system76-power profile output looks like:
+
+        Power Profile: Balanced
+        Backlight
+          gmux_backlight: 35048/82311 = 42%
+        Keyboard Backlight
+          smc::kbd_backlight: 0/255 = 0%
+
+    The value we want is on the FIRST matching line (one of `prefixes`),
+    never the last line — trailing lines are unrelated backlight/extra
+    info and must not be parsed as the profile value.
+    """
     if not out:
         return None
-    line = out.strip().splitlines()[-1]
-    if ":" in line:
-        line = line.split(":", 1)[1]
-    return line.strip().lower()
+    for line in out.strip().splitlines():
+        line = line.strip()
+        lower = line.lower()
+        for prefix in prefixes:
+            if lower.startswith(prefix):
+                value = line.split(":", 1)[1] if ":" in line else ""
+                value = value.strip().lower()
+                if value:
+                    return value
+    return None
 
 def get_current_graphics():
+    # Per system76-power's own source (src/client.rs), `system76-power
+    # graphics` with no arguments prints ONLY the bare mode name on its
+    # own line — e.g. just "hybrid" — with no "Graphics mode:" label at
+    # all. So just take the first non-empty line verbatim.
     out, err, rc = run_cmd(["system76-power", "graphics"], timeout=QUERY_TIMEOUT)
     if rc == 0 and out:
-        return _extract_value(out)
+        first_line = out.strip().splitlines()[0].strip().lower()
+        return first_line or None
     return None
 
 def get_current_profile():
     out, err, rc = run_cmd(["system76-power", "profile"], timeout=QUERY_TIMEOUT)
     if rc == 0 and out:
-        return _extract_value(out)
+        return _extract_value(out, ("power profile", "profile"))
     return None
 
 def set_graphics(mode):
@@ -245,9 +270,9 @@ class GPUMode:
         self.status_msg = ""
         self.status_ok  = True
         self.status_ts  = 0
-        self.cur_graphics = None
-        self.cur_profile  = None
-        self.pending_reboot = False
+        self.cur_graphics     = None   # what is CURRENTLY RUNNING (from re-query)
+        self.pending_graphics = None   # what was requested but needs a reboot
+        self.cur_profile      = None
         self._setup_colors()
         self._refresh_state()
         self._layout()
@@ -262,6 +287,13 @@ class GPUMode:
         w = min(PANEL_W, W)
         self.scr = curses.newwin(h, w, y0, x0)
         self.scr.keypad(True)
+        # Clear the full terminal ONLY here — at startup and on resize —
+        # so any stale content outside the panel's new position is wiped.
+        # Doing this on every draw() call (instead of just here) was the
+        # cause of the visible flicker, since it blanks then redraws the
+        # whole screen on every refresh tick.
+        self.stdscr.erase()
+        self.stdscr.refresh()
 
     def _setup_colors(self):
         """
@@ -320,10 +352,12 @@ class GPUMode:
         curses.init_pair(P_ACCENT,   MAGENTA, BLACK)
         curses.init_pair(P_MODE,     WHITE,      BLACK)
         curses.init_pair(P_HELP,     WHITE,      BLACK)
+        curses.init_pair(P_PENDING,  RED,        BLACK)
 
     def _refresh_state(self):
-        self.cur_graphics = get_current_graphics()
-        self.cur_profile  = get_current_profile()
+        self.cur_graphics     = get_current_graphics()
+        self.cur_profile      = get_current_profile()
+        self.pending_graphics = None   # clear any pending-reboot state on refresh
 
     def set_status(self, msg, ok=True):
         self.status_msg = msg
@@ -340,9 +374,6 @@ class GPUMode:
                 pass
             self.stdscr.refresh()
             return
-
-        self.stdscr.erase()
-        self.stdscr.refresh()
 
         win = self.scr
         win.erase()
@@ -361,20 +392,36 @@ class GPUMode:
 
         self._draw_status_bar(h, w)
         self._draw_help(h, w)
-        win.refresh()
+
+        # noutrefresh (no physical screen write yet) + a single doupdate()
+        # batches the actual terminal write into one pass, avoiding the
+        # visible blank-then-redraw flash that erase()+refresh() causes.
+        win.noutrefresh()
+        curses.doupdate()
 
     def _draw_header(self, w):
-        # Row 1: title only (compact — no subtitle row to save vertical space)
+        # Row 1: title only
         title = "GPU-MODE"
         addstr_clipped(self.scr, 1, 2, "*", curses.color_pair(P_DIM))
         addstr_clipped(self.scr, 1, w - len(title) - 2, title,
                        curses.color_pair(P_HEADER) | curses.A_BOLD)
 
-        # Row 2: live state badge
+        # Row 2: live state badge.
+        # GPU shows the currently RUNNING mode (magenta), plus pending
+        # mode in red if a reboot-required switch has been requested.
         g = (self.cur_graphics or "?").upper()
         p = (self.cur_profile  or "?").upper()
-        badge = f"GPU:{g} CPU:{p}"
-        addstr_clipped(self.scr, 2, 2, badge,
+        x = 2
+        addstr_clipped(self.scr, 2, x, f"GPU:{g}",
+                       curses.color_pair(P_ACCENT) | curses.A_BOLD)
+        x += len(f"GPU:{g}")
+        if self.pending_graphics:
+            pg = self.pending_graphics.upper()
+            pending_txt = f"->{pg}"
+            addstr_clipped(self.scr, 2, x, pending_txt,
+                           curses.color_pair(P_ERR) | curses.A_BOLD)
+            x += len(pending_txt)
+        addstr_clipped(self.scr, 2, x, f" CPU:{p}",
                        curses.color_pair(P_ACCENT) | curses.A_BOLD)
 
         dbl_hline(self.scr, 3, 0, w, P_BORDER)
@@ -420,23 +467,23 @@ class GPUMode:
           4  tabs
           5  ╠══════╣
           6..9   item rows (left) / desc title+sub (right)      -> 4 rows
-          10     ╨ divider bottom / blank
-          11     ╠══════╣ (status sep)
-          12     status text
-          13     ╠══════╣ (help sep)
-          14     help text
+          10     ╠══════╣ (status sep) — divider ends right here, no blank row
+          11     status text
+          12     ╠══════╣ (help sep)
+          13     help text
+          14     (unused — kept for breathing room above bottom frame)
           15     ╚══frame bottom══╝
         """
         LIST_W   = 13             # left column width (inside frame) — fits "PERFORMANCE"
         DESC_X   = LIST_W + 3     # description column start
         DESC_W   = w - DESC_X - 1
         TOP      = 6              # first content row (mode list / desc title)
-        DIV_BOT  = 10             # row where the inner vertical divider ends
+        DIV_BOT  = 9              # last content row (4 rows: 6,7,8,9 — no trailing blank)
 
         # ── left column: mode list (one row per item) ──────────────────────
         for i, item in enumerate(items):
             y = TOP + i
-            if y >= DIV_BOT:
+            if y > DIV_BOT:
                 break
             is_sel = (i == cursor)
             is_cur = (item["id"] == current_id)
@@ -449,6 +496,8 @@ class GPUMode:
                 attr_label = curses.color_pair(P_SELECTED)
             elif is_cur:
                 attr_label = curses.color_pair(P_ACCENT) | curses.A_BOLD
+            elif item["id"] == self.pending_graphics:
+                attr_label = curses.color_pair(P_PENDING) | curses.A_BOLD
             else:
                 attr_label = curses.color_pair(P_MODE)
 
@@ -456,8 +505,10 @@ class GPUMode:
             label = item["label"][:LIST_W - 2]
             addstr_clipped(self.scr, y, 1, f"{marker}{label}", attr_label)
 
-        # vertical divider between list and description
-        inner_vline(self.scr, TOP - 1, DIV_BOT, LIST_W + 1, P_BORDER,
+        # vertical divider between list and description — ends exactly at
+        # the last content row, with its bottom T-junction merging directly
+        # into the status separator line below (no blank row in between).
+        inner_vline(self.scr, TOP - 1, DIV_BOT + 1, LIST_W + 1, P_BORDER,
                     top_t="╥", bot_t="╨")
 
         # ── right column: description ───────────────────────────────────────
@@ -476,7 +527,7 @@ class GPUMode:
         # reboot/instant badge — right-aligned on the same row as the title
         if sel["reboot"]:
             badge = "!REBOOT"
-            badge_attr = curses.color_pair(P_WARN) | curses.A_BOLD
+            badge_attr = curses.color_pair(P_PENDING) | curses.A_BOLD
         else:
             badge = "OK INSTANT"
             badge_attr = curses.color_pair(P_ACTIVE) | curses.A_BOLD
@@ -484,10 +535,10 @@ class GPUMode:
         if badge_x > DESC_X + len(title_text) + (8 if is_cur_sel else 0):
             addstr_clipped(self.scr, TOP, badge_x, badge, badge_attr)
 
-        # word-wrapped description fills the remaining rows down to DIV_BOT-1
+        # word-wrapped description fills the remaining rows down to DIV_BOT
         lines = textwrap.wrap(sel["desc"], width=DESC_W)
         first_desc_row = TOP + 1
-        max_lines = DIV_BOT - first_desc_row
+        max_lines = DIV_BOT - first_desc_row + 1
         for i, line in enumerate(lines[:max_lines]):
             addstr_clipped(self.scr, first_desc_row + i, DESC_X, line,
                            curses.color_pair(P_NORMAL))
@@ -519,13 +570,18 @@ class GPUMode:
                 self.set_status(f"{label} is already active.", ok=True)
                 return
             self.set_status(f"Switching to {label}... (up to {SWITCH_TIMEOUT}s)", ok=True)
-            self.draw()   # paint the "working" message before the blocking call
+            self.draw()
             ok, msg = set_graphics(mode)
             if ok:
-                self.cur_graphics = mode
-                suffix = "  — REBOOT required to apply." if reboot else ""
-                self.set_status(f"Graphics set to {label}.{suffix}", ok=True)
+                # Graphics changes need a reboot — the running mode hasn't
+                # changed yet. Track the requested mode as "pending" and
+                # display it in red. Do NOT re-query: the daemon may be in
+                # a transient state and return a misleading mode name.
+                self.pending_graphics = mode
+                self.set_status(f"Set to {label}. REBOOT to apply.", ok=True)
             else:
+                # Re-query only on failure to get accurate current state
+                self.cur_graphics = get_current_graphics()
                 self.set_status(f"Error: {msg}", ok=False)
         else:
             prof  = POWER_PROFILES[self.p_cursor]["id"]
@@ -534,53 +590,82 @@ class GPUMode:
                 self.set_status(f"{label} is already active.", ok=True)
                 return
             self.set_status(f"Switching to {label}...", ok=True)
-            self.draw()   # paint the "working" message before the blocking call
+            self.draw()
             ok, msg = set_profile(prof)
-            if ok:
-                self.cur_profile = prof
+            # Profile changes take effect immediately — re-query is safe
+            # and handles the transient D-Bus error case correctly.
+            self.cur_profile = get_current_profile()
+            if self.cur_profile == prof:
                 self.set_status(f"Profile set to {label}. Active immediately.", ok=True)
+            elif ok:
+                self.set_status(f"Profile set to {label}.", ok=True)
             else:
                 self.set_status(f"Error: {msg}", ok=False)
 
     def run(self):
         curses.curs_set(0)
-        self.stdscr.timeout(1000)   # 1 s refresh for status message expiry
+        self.stdscr.timeout(1000)   # 1 s tick, only used to expire the status message
         self.scr.timeout(1000)
 
+        self.draw()   # initial paint
+        status_was_showing = bool(self.status_msg)
+
         while True:
-            self.draw()
             key = self.scr.getch()
 
             items_len = len(GRAPHICS_MODES) if self.tab == self.TAB_GRAPHICS \
                         else len(POWER_PROFILES)
 
+            needs_redraw = False
+
             if key == curses.KEY_RESIZE:
                 self._layout()
                 self.scr.timeout(1000)
-                continue
+                needs_redraw = True
             elif key in (ord('q'), ord('Q'), 27):
                 break
             elif key in (ord('g'), ord('G')):
                 self.tab = self.TAB_GRAPHICS
+                needs_redraw = True
             elif key in (ord('p'), ord('P')):
                 self.tab = self.TAB_PROFILE
+                needs_redraw = True
             elif key in (ord('r'), ord('R')):
                 self._refresh_state()
                 self.set_status("State refreshed.", ok=True)
+                needs_redraw = True
             elif key == curses.KEY_UP:
                 if self.tab == self.TAB_GRAPHICS:
                     self.g_cursor = (self.g_cursor - 1) % items_len
                 else:
                     self.p_cursor = (self.p_cursor - 1) % items_len
+                needs_redraw = True
             elif key == curses.KEY_DOWN:
                 if self.tab == self.TAB_GRAPHICS:
                     self.g_cursor = (self.g_cursor + 1) % items_len
                 else:
                     self.p_cursor = (self.p_cursor + 1) % items_len
+                needs_redraw = True
             elif key in (curses.KEY_ENTER, 10, 13):
                 self.apply_current()
+                needs_redraw = True
             elif key == ord('\t'):
                 self.tab = 1 - self.tab
+                needs_redraw = True
+            elif key == -1:
+                # Idle timeout tick — only redraw if the status message's
+                # visible/expired state just changed (so it disappears
+                # promptly after 8s), not on every single tick.
+                status_showing_now = bool(self.status_msg) and \
+                                      (time.time() - self.status_ts) < 8
+                if status_showing_now != status_was_showing:
+                    needs_redraw = True
+                status_was_showing = status_showing_now
+
+            if needs_redraw:
+                self.draw()
+                status_was_showing = bool(self.status_msg) and \
+                                      (time.time() - self.status_ts) < 8
 
 
 def main():
@@ -591,5 +676,173 @@ def main():
     curses.wrapper(_run)
 
 
+# ─── self-spawning launcher ─────────────────────────────────────────────────
+#
+# When run normally from a shell, gpu-mode re-execs itself inside a freshly
+# spawned terminal window sized to exactly fit the fixed PANEL_W x PANEL_H
+# panel, then exits the original invocation immediately. The spawned
+# terminal closes on its own once the app exits (q / Ctrl-C), since most
+# terminal emulators close their window when the foreground process ends.
+#
+# Set GPU_MODE_SPAWNED=1 to skip spawning and just run the TUI directly in
+# the current terminal (this is what the spawned window's command does).
+
+_SPAWN_MARKER = "GPU_MODE_SPAWNED"
+
+# (terminal binary, args-builder) — tried in this order. args-builder takes
+# (cols, rows, exec_argv) and returns the full argv to launch that terminal.
+# cols/rows are character-cell dimensions; exec_argv is this script's own
+# re-exec command (python3 + this file path + the spawn marker is set via
+# env, not argv).
+def _build_shell_command_raw(inner_cmd):
+    """Wrap a shell command string so that on failure it prints the exit
+    code and waits for a keypress before the terminal closes — so a crash
+    is visible instead of the window vanishing instantly.
+    """
+    return (
+        f"{inner_cmd}; "
+        f'ec=$?; '
+        f'if [ "$ec" -ne 0 ]; then '
+        f'  echo; echo "[gpu-mode] exited with code $ec"; '
+        f'  echo "[gpu-mode] press Enter to close this window..."; '
+        f'  read _; '
+        f'fi'
+    )
+
+def _terminal_candidates(cols, rows, shell_cmd):
+    geometry = f"{cols}x{rows}"
+    return [
+        # xterm: the most reliable for exact character-cell geometry.
+        ("xterm", ["xterm", "-geometry", geometry, "-fa", "Monospace",
+                   "-fs", "11", "-e", "sh", "-c", shell_cmd]),
+        # GNOME Terminal (Pop!_OS pre-COSMIC default, still common).
+        ("gnome-terminal", ["gnome-terminal", f"--geometry={geometry}",
+                             "--", "sh", "-c", shell_cmd]),
+        ("tilix", ["tilix", f"--geometry={geometry}", "-e",
+                    f"sh -c {_sh_quote(shell_cmd)}"]),
+        ("konsole", ["konsole", "--geometry", geometry, "-e",
+                      "sh", "-c", shell_cmd]),
+        ("alacritty", ["alacritty", "-o",
+                        f"window.dimensions.columns={cols}",
+                        "-o", f"window.dimensions.lines={rows}",
+                        "-e", "sh", "-c", shell_cmd]),
+        ("kitty", ["kitty", "-o", f"initial_window_width={cols}c",
+                    "-o", f"initial_window_height={rows}c",
+                    "sh", "-c", shell_cmd]),
+        # COSMIC Terminal — last resort. No documented --geometry flag,
+        # and has a confirmed crash in at least one build when given
+        # multi-token -e arguments. Only used if nothing else is found.
+        ("cosmic-term", ["cosmic-term", "-e", shell_cmd]),
+        ("x-terminal-emulator", ["x-terminal-emulator", "-e",
+                                   "sh", "-c", shell_cmd]),
+    ]
+
+def _sh_quote(s):
+    return shlex.quote(s)
+
+def _find_terminal(cols, rows, shell_cmd):
+    """Return the first terminal launch argv to use.
+
+    Preference order:
+      1. $TERMINAL env var, if set and the binary exists on PATH.
+      2. The system's configured default (`update-alternatives
+         --query x-terminal-emulator`), if it resolves to a binary we
+         know how to size.
+      3. The static candidate list, first match wins.
+    """
+    candidates = _terminal_candidates(cols, rows, shell_cmd)
+    by_name = {name: argv for name, argv in candidates}
+
+    # 1. Explicit user preference via $TERMINAL.
+    term_env = os.environ.get("TERMINAL", "").strip()
+    if term_env:
+        base = os.path.basename(term_env)
+        if base in by_name and shutil.which(base):
+            return by_name[base]
+        elif shutil.which(term_env):
+            return [term_env, "-e", "sh", "-c", shell_cmd]
+
+    # 2. System-configured default terminal (Debian/Ubuntu alternatives).
+    try:
+        result = subprocess.run(
+            ["update-alternatives", "--query", "x-terminal-emulator"],
+            capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if line.startswith("Value:"):
+                    default_path = line.split(":", 1)[1].strip()
+                    base = os.path.basename(default_path)
+                    # Debian/Ubuntu often registers a "*.wrapper" script
+                    # (e.g. tilix.wrapper, gnome-terminal.wrapper) rather
+                    # than the real binary name — strip that suffix so it
+                    # still matches our candidate list.
+                    if base.endswith(".wrapper"):
+                        base = base[: -len(".wrapper")]
+                    if base in by_name and shutil.which(base):
+                        return by_name[base]
+                    elif shutil.which(base):
+                        return [base, "-e", "sh", "-c", shell_cmd]
+                    break
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # 3. Static ordered list — first installed binary wins.
+    for name, argv in candidates:
+        if shutil.which(name):
+            return argv
+    return None
+
+def _spawn_in_sized_terminal():
+    """Spawn a new terminal window sized for PANEL_W x PANEL_H and exit."""
+    script_path = os.path.abspath(__file__)
+    cols = PANEL_W
+    rows = PANEL_H
+
+    # Build the inner command as a single shell string so every terminal's
+    # -e flag handles it identically, regardless of how strictly each one
+    # splits multi-token -e arguments (this was the actual cause of the
+    # window opening then closing instantly with Tilix — see chat history).
+    # The spawn marker is set inline in the command itself rather than
+    # relying solely on env propagation, since not every terminal reliably
+    # forwards a custom environment to the child process.
+    inner_argv = [
+        f"{_SPAWN_MARKER}=1",
+        sys.executable,
+        script_path,
+    ]
+    inner_cmd = " ".join(shlex.quote(a) for a in inner_argv)
+    shell_cmd = _build_shell_command_raw(inner_cmd)
+
+    argv = _find_terminal(cols, rows, shell_cmd)
+
+    if argv is None:
+        # No known terminal emulator found — just run in place instead of
+        # silently failing.
+        os.environ[_SPAWN_MARKER] = "1"
+        main()
+        return
+
+    env = os.environ.copy()
+    env[_SPAWN_MARKER] = "1"
+    try:
+        subprocess.Popen(argv, env=env)
+    except OSError as e:
+        # Spawn failed for some reason — fall back to running in place,
+        # but tell the user why instead of failing silently.
+        print(f"[gpu-mode] could not launch a terminal window ({e}); "
+              f"running here instead.", file=sys.stderr)
+        os.environ[_SPAWN_MARKER] = "1"
+        main()
+        return
+    # Original invocation's job is done — the spawned terminal now owns
+    # the app. Exit immediately so the launching shell gets its prompt
+    # back right away instead of waiting.
+    sys.exit(0)
+
+
 if __name__ == "__main__":
-    main()
+    if os.environ.get(_SPAWN_MARKER) == "1":
+        main()
+    else:
+        _spawn_in_sized_terminal()
