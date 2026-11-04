@@ -20,10 +20,10 @@ It replaces redoing all of that by hand from old notes and sessions.
 
 On this laptop, **Plasma X11 does not recover the HDMI monitor after suspend** unless the NVIDIA sleep hooks do their virtual-terminal (VT) switch. Pop's Cosmic setup (the `50-cosmic-no-vt-switch.conf` drop-ins) turns that switch off for every session, because Cosmic crashes with it. The `60-plasma-vt-switch.conf` drop-ins make it conditional: the switch is skipped only when Cosmic's compositor is running.
 
-- The `system` section installs both drop-ins; the `60-` ones go in through [`plasma-suspend-fix-redo.sh`](../plasma-suspend-fix/plasma-suspend-fix-redo.sh).
-- `utils` installs that script to `~/.local/bin/` for later use.
+- The `system` section installs both drop-ins; the `60-` ones go in through `plasma-suspend-fix-redo.sh`, which lives in its own repo, [`pop_os_fixes`](https://github.com/MorfeoMatrixx/pop_os_fixes) (cloned to `~/claude/pop_os_fixes` by the `system` and `utils` sections).
+- `utils` symlinks it as `~/bin/plasma-suspend-fix-redo` for later use.
 - **Every run ends with a mandatory check of the fix.** If it's missing or blocked, it prints `MISSING`/`BLOCKED` in red and exits with status 1, even in `--check` mode.
-- After any future OS or NVIDIA driver upgrade, run `plasma-suspend-fix-redo.sh --check` (see [../plasma-migration/README.md](../plasma-migration/README.md) for the background).
+- After any future OS or NVIDIA driver upgrade, run `plasma-suspend-fix-redo --check` (see [../plasma-migration/README.md](../plasma-migration/README.md) for the background).
 
 ## What it does
 
@@ -34,7 +34,7 @@ On this laptop, **Plasma X11 does not recover the HDMI monitor after suspend** u
 | `flatpak` | MarkText, OrcaSlicer, PhotoCollage, Decoder, Angry IP Scanner, qBittorrent, NetPeek (from Flathub), and cosmic-ext-connected (from the Cosmic Flatpak repo) |
 | `extras` | fastfetch (latest `.deb`), yscan (`cargo`), crontab-ui (`npm` + user service), Claude Code (official installer). Reminds you about FlashForgeUI and Flash Studio, which have no stable download URL |
 | `system` | **The NVIDIA suspend/wake fix** (above), the `spd5118` kernel-module blacklist (fixes a suspend crash on the LOQ), NAS CIFS automounts in `/etc/fstab` plus the credentials file (prompted), `/etc/hosts` pins for the NAS and pidp-11, a sudoers rule so `system76-power` runs without a password, and the `/etc/profile.d/vte.sh` link for Tilix. Passwordless sudo is **opt-in** (`--nopasswd-sudo`) |
-| `utils` | Clones this repo if needed and installs our utilities: `dir-backup.sh` and `dir-sync.sh` (each with launcher), `sd-backup.sh`, grok-sync, grok-dedup, linux-sync, `linux-nodes-status.sh`, `ssh-node-setup.sh`, lanscan, gpu-mode, `set-default-apps.sh`, `plasma-suspend-fix-redo.sh`, plus their icons and app-menu launchers |
+| `utils` | Clones this repo (and `pop_os_fixes`) if needed and **symlinks** our utilities into `~/bin` as extension-less commands (sources stay in their project dirs; nothing is copied): `dir-backup` and `dir-sync` (each with launcher), `sd-backup`, grok-sync, grok-dedup, linux-sync, `linux-nodes-status`, `ssh-node-setup`, `plasma-suspend-fix-redo`, plus the MCU tools, the Orca wrapper and `nodemon-launch` when their project dirs exist (skipped with a NOTE otherwise). lanscan, gpu-mode and `set-default-apps` go through their own installers (which also make the `/usr/local/bin` links / sudoers rule). Then icons and app-menu launchers. Convention: `~/.claude/CLAUDE.md` |
 | `dotfiles` | The `JLC CUSTOMIZATIONS` block in `~/.bashrc` (PATH, the Tilix fix, the hybrid-GPU video fix, crontab-ui's database path), git identity, `gh auth login` |
 | `plasma` | **Only inside a Plasma session.** Tilix as the default terminal with Ctrl+Alt+T, **PrtScr = select a region, auto-saved to `~/Documents` without opening Spectacle's window** (Spectacle's other shortcuts stay: Shift/Meta+PrtScr), Tilix using the normal window frame, double-click to open, Breeze window decoration with a 4 px border, the `cosmic-jlc` colour scheme (purple title bar and border on the focused window with black title text; dark on the others), default apps (KWrite for text and code, MarkText for `.md`, Okular for PDF, Dolphin for folders), and NAS bookmarks in Dolphin's sidebar |
 
@@ -117,7 +117,7 @@ At the **sddm** login screen, open the session menu and choose **"Plasma"**. **N
 - **Suspend/wake with the HDMI monitor connected** (mandatory). Suspend, wake, and confirm the external monitor comes back without needing a replug or `xrandr`. Then:
   ```bash
   journalctl -b -t suspend | tail -3            # expect: "non-COSMIC: normal VT switch"
-  plasma-suspend-fix-redo.sh --check            # expect: "Fix is in place - nothing to do."
+  plasma-suspend-fix-redo --check               # expect: "Fix is in place - nothing to do."
   ```
 - **NAS:** open `wdnas_public` in Dolphin's sidebar. It should mount on first access.
 - **Window focus:** click between two windows. The focused one has a purple title bar and border.
@@ -147,7 +147,7 @@ Exit codes: `0` success, `1` the mandatory NVIDIA fix isn't in place, `2` usage 
 ## Troubleshooting
 
 - **No Plasma login screen after reboot (still Cosmic's greeter).** The display-manager preseed didn't take. Run `sudo dpkg-reconfigure sddm`, choose `sddm`, and reboot.
-- **HDMI stays dark after resume.** Run `plasma-suspend-fix-redo.sh`. If it says the NVIDIA mechanism changed (`BLOCKED`), the driver's sleep script is different now; investigate before forcing anything.
+- **HDMI stays dark after resume.** Run `plasma-suspend-fix-redo`. If it says the NVIDIA mechanism changed (`BLOCKED`), the driver's sleep script is different now; investigate before forcing anything.
 - **Suspend itself crashes or hangs.** Check that `spd5118` isn't loaded: `lsmod | grep spd5118` should print nothing. The old system also had `mem_sleep_default=deep` on the kernel command line. It isn't set by this script because it's unclear whether Pop!_OS adds it itself. Compare `cat /proc/cmdline` and add it with `sudo kernelstub -a mem_sleep_default=deep` only if needed.
 - **The purple border vanished but the title bar is still purple.** This happens after picking the colour scheme again in *System Settings → Colors*, which drops two lines from `~/.config/kdeglobals`. Re-run `--only plasma`.
 - **A window has no border at all.** Apps that draw their own title bar (Claude desktop, GTK header-bar apps, Chrome by default) and maximized windows never get the KWin frame. That's expected.
@@ -163,6 +163,6 @@ Exit codes: `0` success, `1` the mandatory NVIDIA fix isn't in place, `2` usage 
 
 ## Related
 
-- [`../plasma-suspend-fix/`](../plasma-suspend-fix/): the NVIDIA suspend fix reapply tool
+- [`pop_os_fixes`](https://github.com/MorfeoMatrixx/pop_os_fixes): the NVIDIA suspend fix reapply tool (separate repo)
 - [`../plasma-migration/`](../plasma-migration/): backups and rollback scripts from the original Cosmic → Plasma migration
 - [`../default-apps/set-default-apps.sh`](../default-apps/set-default-apps.sh): re-applies the default apps on its own

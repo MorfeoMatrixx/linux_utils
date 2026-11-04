@@ -20,6 +20,9 @@ ASSETS=$HERE/assets
 # Use the linux_utils checkout this script runs from; else clone it to ~/claude/utils
 if [[ -d $HERE/../.git ]]; then REPO=$(cd "$HERE/.." && pwd); else REPO=$HOME/claude/utils; fi
 REPO_URL=https://github.com/MorfeoMatrixx/linux_utils.git
+# The NVIDIA suspend-fix tool lives in its own repo (not linux_utils), cloned to ~/claude/pop_os_fixes
+FIXDIR=$HOME/claude/pop_os_fixes
+FIX_URL=https://github.com/MorfeoMatrixx/pop_os_fixes.git
 SECTIONS=(repos apt flatpak extras system utils dotfiles plasma)
 BK=$HOME/pop-os-post-install-backup-$(date +%Y%m%d-%H%M%S)
 
@@ -47,6 +50,12 @@ inst() {   # inst SRC DEST [MODE] [sudo] - copy if different
     if $s cmp -s "$src" "$dest" 2>/dev/null; then ok "$dest"; return; fi
     act "install $dest" bash -c "$s mkdir -p \"$(dirname "$dest")\" && $s install -m $mode \"$src\" \"$dest\""
 }
+lnk() {   # lnk SRC NAME - ~/bin/NAME must be a symlink to SRC (sources live in project dirs, never copied)
+    local src=$1 dest=$HOME/bin/$2
+    [[ -e $src ]] || { note "~/bin/$2: source ${src/#$HOME/\~} not present - skipped"; return 0; }
+    if [[ -L $dest && $(readlink -f "$dest") == $(readlink -f "$src") ]]; then ok "~/bin/$2"; return; fi
+    act "link ~/bin/$2 -> $src" bash -c "$(declare -f bk); BK='$BK'; [[ -f '$dest' && ! -L '$dest' ]] && bk '$dest'; mkdir -p '$HOME/bin'; chmod +x '$src'; ln -sfn '$src' '$dest'"
+}
 kset() {   # kset FILE GROUP KEY VALUE - kwriteconfig5 if different
     [[ $(kreadconfig5 --file "$1" --group "$2" --key "$3") == "$4" ]] && { ok "$1 [$2] $3=$4"; return; }
     act "$1 [$2] $3=$4" kwriteconfig5 --file "$1" --group "$2" --key "$3" "$4"
@@ -64,10 +73,10 @@ ${BOLD}Sections${RESET} (run in this order)
             NetPeek, cosmic-ext-connected
   extras    fastfetch (.deb), yscan (cargo), crontab-ui (npm + user service), Claude Code
   system    ${BOLD}MANDATORY NVIDIA suspend/wake fix${RESET} (50- Cosmic + 60- Plasma drop-ins via
-            plasma-suspend-fix-redo.sh; verified at the end of every run), spd5118 blacklist,
+            plasma-suspend-fix-redo from the pop_os_fixes repo; verified at the end of every run), spd5118 blacklist,
             NAS CIFS automounts + credentials (prompted), /etc/hosts pins, sudoers rule
             for system76-power, Tilix vte.sh link. With --nopasswd-sudo: passwordless sudo
-  utils     clone linux_utils to ~/claude/utils and install our utilities + launchers
+  utils     clone linux_utils to ~/claude/utils and clone linux_utils + pop_os_fixes, symlink our utilities into ~/bin + launchers
   dotfiles  ~/.bashrc block, git identity, gh login
   plasma    ${BOLD}run from inside a Plasma (X11) session${RESET}: Tilix default + Ctrl+Alt+T,
             PrtScr = region screenshot auto-saved to ~/Documents, double-click, Breeze + cosmic-jlc purple focus frame, default apps, NAS bookmarks
@@ -215,6 +224,11 @@ ensure_repo() {
     act "clone $REPO_URL -> $REPO" git clone "$REPO_URL" "$REPO"
 }
 
+ensure_fixes() {
+    [[ -d $FIXDIR/.git ]] && return 0
+    act "clone $FIX_URL -> $FIXDIR" git clone "$FIX_URL" "$FIXDIR"
+}
+
 sec_system() {
     hdr "[system] System fixes and config (/etc)"
     local tmp
@@ -235,8 +249,8 @@ sec_system() {
         done
         (( NEEDED && !CHECK )) && sudo systemctl daemon-reload
         (( NEEDED )) || NEEDED=$before
-        ensure_repo
-        local R=$REPO/plasma-suspend-fix/plasma-suspend-fix-redo.sh rc=0
+        ensure_repo; ensure_fixes
+        local R=$FIXDIR/plasma-suspend-fix-redo.sh rc=0
         if [[ -x $R ]]; then
             "$R" --check >/dev/null 2>&1 || rc=$?
             case $rc in
@@ -244,7 +258,7 @@ sec_system() {
                 1) act "install 60-plasma-vt-switch drop-ins" "$R" -y ;;
                 *) note "plasma-suspend-fix-redo.sh refused (NVIDIA sleep mechanism changed?) - investigate" ;;
             esac
-        else note "60- drop-ins: re-run after the repo is cloned"; fi
+        else note "60- drop-ins: $R not found - re-run once pop_os_fixes is cloned"; fi
     else
         note "nvidia-suspend.service not found - NVIDIA driver missing? Skipping suspend drop-ins"
     fi
@@ -288,25 +302,30 @@ sec_system() {
 }
 
 sec_utils() {
-    hdr "[utils] Our utilities (~/claude/utils -> ~/bin, ~/.local/bin)"
-    ensure_repo
+    hdr "[utils] Our utilities (sources in project dirs -> extension-less symlinks in ~/bin)"
+    ensure_repo; ensure_fixes
     [[ -d $REPO/.git ]] || { note "repo not cloned yet - nothing more to check"; return 0; }
-    local f
+    local f n T=$HOME/Electronics/MCU_DEV/tools
+    # ~/bin only ever holds symlinks to the sources (see ~/.claude/CLAUDE.md); name = source minus extension
     for f in backup2nas/dir-backup.sh backup2nas/dir-backup-launch.sh backup2nas/dir-sync.sh backup2nas/dir-sync-launch.sh backup2nas/sd-backup.sh grok-sync/grok-sync.sh grok-sync/grok-sync-launch.sh \
              grok-dedup/grok-dedup.sh grok-dedup/grok-dedup-ui.py grok-dedup/grok-dedup-launch.sh \
              linux-sync/linux-sync.sh linux-sync/linux-sync-launch.sh linux-sync/linux-sync-cron-check.sh \
              linux-sync/linux-sync-status.sh linux-nodes-status/linux-nodes-status.sh ssh-passwordless-setup/ssh-node-setup.sh; do
-        inst "$REPO/$f" "$HOME/bin/$(basename "$f")" 755
+        n=$(basename "$f"); lnk "$REPO/$f" "${n%.*}"
     done
-    inst "$REPO/backup2nas/dir-backup.dialogrc" "$HOME/bin/dir-backup.dialogrc"
-    inst "$REPO/plasma-suspend-fix/plasma-suspend-fix-redo.sh" "$HOME/.local/bin/plasma-suspend-fix-redo.sh" 755
+    lnk "$REPO/backup2nas/dir-backup.dialogrc" dir-backup.dialogrc   # sidecar config keeps its extension
+    lnk "$FIXDIR/plasma-suspend-fix-redo.sh" plasma-suspend-fix-redo
+    # Tools whose sources live outside linux_utils (skipped with a NOTE when that project dir isn't there)
+    for f in mcu-serial.sh mcu-toolbox.sh arduino-ide.sh serial-capture.py usb-serial-list.sh; do lnk "$T/$f" "${f%.*}"; done
+    lnk "$HOME/3D_Printing/utils/orca-slicer-with-flashforgeui.sh" orca-slicer-with-flashforgeui
+    lnk "$HOME/Home_Assistant_Project/nodemon/nodemon-launch.sh" nodemon-launch
     # Utilities with their own installers (they also set up /usr/local/bin links / sudoers)
-    [[ -L /usr/local/bin/lanscan.sh ]] && cmp -s "$REPO/lanscan/lanscan.sh" "$HOME/bin/lanscan.sh" && ok "lanscan" || \
+    [[ -L /usr/local/bin/lanscan && $(readlink -f /usr/local/bin/lanscan) == $(readlink -f "$REPO/lanscan/lanscan.sh") ]] && ok "lanscan" || \
         act "lanscan (install-lanscan.sh)" bash "$REPO/lanscan/install-lanscan.sh"
-    cmp -s "$REPO/gpu-mode/gpu-mode.py" "$HOME/.local/bin/gpu-mode" && ok "gpu-mode" || \
+    [[ $(readlink -f "$HOME/bin/gpu-mode" 2>/dev/null) == $(readlink -f "$REPO/gpu-mode/gpu-mode.py") ]] && ok "gpu-mode" || \
         act "gpu-mode (gpu-mode-install.sh)" bash "$REPO/gpu-mode/gpu-mode-install.sh"
-    [[ -L /usr/local/bin/set-default-apps.sh ]] && cmp -s "$REPO/default-apps/set-default-apps.sh" "$HOME/bin/set-default-apps.sh" && ok "set-default-apps.sh" || \
-        act "set-default-apps.sh (install-default-apps.sh)" bash "$REPO/default-apps/install-default-apps.sh"
+    [[ -L /usr/local/bin/set-default-apps && $(readlink -f /usr/local/bin/set-default-apps) == $(readlink -f "$REPO/default-apps/set-default-apps.sh") ]] && ok "set-default-apps" || \
+        act "set-default-apps (install-default-apps.sh)" bash "$REPO/default-apps/install-default-apps.sh"
     # Icons + launchers (repo .desktop files hardcode /home/jlc; rewrite to this $HOME)
     local I=$HOME/.local/share/icons n
     inst "$REPO/grok-sync/grok-sync.png" "$I/grok-sync.png"
@@ -331,7 +350,7 @@ sec_dotfiles() {
         act "append JLC block to ~/.bashrc" bash -c "$(declare -f bk); BK='$BK'; bk '$HOME/.bashrc'; cat >> '$HOME/.bashrc'" <<'EOF'
 
 # >>> JLC CUSTOMIZATIONS >>>
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/bin:$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 # Tilix: report the cwd so new tabs/splits open in the same directory
 if [ -n "$TILIX_ID" ] || [ -n "$VTE_VERSION" ]; then
     [ -f /etc/profile.d/vte.sh ] && source /etc/profile.d/vte.sh
@@ -507,14 +526,14 @@ done
 
 # MANDATORY: without the 60- drop-ins, an HDMI monitor on the NVIDIA GPU stays dark after
 # suspend/resume in Plasma X11 (Pop's 50- Cosmic drop-ins skip the VT switch KWin needs).
-hdr "Mandatory check: NVIDIA suspend/wake fix (plasma-suspend-fix-redo.sh)"
-FIX=$REPO/plasma-suspend-fix/plasma-suspend-fix-redo.sh; FIXRC=0
+hdr "Mandatory check: NVIDIA suspend/wake fix (plasma-suspend-fix-redo)"
+FIX=$FIXDIR/plasma-suspend-fix-redo.sh; FIXRC=0
 if [[ -x $FIX ]]; then "$FIX" --check >/dev/null 2>&1 || FIXRC=$?; else FIXRC=3; fi
 case $FIXRC in
     0) ok "NVIDIA suspend/wake fix is in place" ;;
     1) echo "  ${RESET}${RED}${BOLD}MISSING${RESET} NVIDIA suspend/wake fix - run: $(basename "$0") --only system" ;;
     2) echo "  ${RESET}${RED}${BOLD}BLOCKED${RESET} plasma-suspend-fix-redo.sh refused (NVIDIA driver or its sleep script changed) - investigate before suspending" ;;
-    3) echo "  ${RESET}${RED}${BOLD}MISSING${RESET} $FIX not found - run: $(basename "$0") --only utils,system" ;;
+    3) echo "  ${RESET}${RED}${BOLD}MISSING${RESET} $FIX not found - run: $(basename "$0") --only system (clones pop_os_fixes)" ;;
 esac
 
 hdr "Done."
