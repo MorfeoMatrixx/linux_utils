@@ -232,7 +232,7 @@ class DeduplicatorApp(tk.Tk):
         self._hide_confirm_row()
         self._confirm_action[1]()
 
-    def _do_permanent_delete(self, paths):
+    def _do_permanent_delete(self, paths, bonus_deleted=0):
         errors = []
         for path in paths:
             try:
@@ -241,19 +241,21 @@ class DeduplicatorApp(tk.Tk):
                 errors.append(f"Permission denied: {Path(path).name}")
             except Exception as e:
                 errors.append(f"{Path(path).name}: {e}")
-        self._finish_delete(paths, errors)
+        self._finish_delete(paths, errors, bonus_deleted)
 
-    def _finish_delete(self, to_delete, errors):
+    def _finish_delete(self, to_delete, errors, bonus_deleted=0):
+        succeeded = len(to_delete) - len(errors) + bonus_deleted
         if errors:
             self._stats['errors'] += len(errors)
+            self._stats['deleted'] += succeeded
             self._set_msg(
                 "  ".join(errors),
                 color='#c0392b',
                 font=('sans', 12, 'bold'),
             )
         else:
-            self._stats['deleted'] += len(to_delete)
-            self._set_msg(f"Deleted {len(to_delete)} file(s).", '#27ae60')
+            self._stats['deleted'] += succeeded
+            self._set_msg(f"Deleted {succeeded} file(s).", '#27ae60')
         self.idx += 1
         self._show_group()
 
@@ -271,7 +273,6 @@ class DeduplicatorApp(tk.Tk):
                 errors.append(f"{Path(path).name}: {e}")
 
         trashed = len(to_delete) - len(no_trash) - len(errors)
-        self._stats['deleted'] += trashed
 
         if no_trash and not self._no_trash_confirmed:
             self._set_msg(
@@ -281,7 +282,7 @@ class DeduplicatorApp(tk.Tk):
             self._show_confirm_row(
                 'Permanently delete?',
                 on_yes=lambda: (setattr(self, '_no_trash_confirmed', True),
-                                self._do_permanent_delete(no_trash)),
+                                self._do_permanent_delete(no_trash, trashed)),
                 on_no=lambda: (self._set_msg('Group skipped.'),
                                self._stats.update({'skipped': self._stats['skipped'] + 1}),
                                setattr(self, 'idx', self.idx + 1),
@@ -290,10 +291,10 @@ class DeduplicatorApp(tk.Tk):
             return
 
         if no_trash:
-            self._do_permanent_delete(no_trash)
+            self._do_permanent_delete(no_trash, trashed)
             return
 
-        self._finish_delete(to_delete, errors)
+        self._finish_delete(to_delete, errors)  # trashed == len(to_delete) here, no bonus needed
 
     def _skip(self):
         self._set_msg('Skipped.')
@@ -335,7 +336,29 @@ class DeduplicatorApp(tk.Tk):
 
 
 
+def force_delete_all(groups):
+    """Batch mode: delete all duplicates silently, keep oldest. No GUI."""
+    deleted = errors = 0
+    for group in groups:
+        for path in group[1:]:   # group[0] is oldest — keep it
+            try:
+                if not try_trash(path):
+                    os.remove(path)
+                deleted += 1
+            except PermissionError:
+                print(f"Permission denied: {path}", file=sys.stderr)
+                errors += 1
+            except Exception as e:
+                print(f"Error deleting {path}: {e}", file=sys.stderr)
+                errors += 1
+    print(
+        f"Done — groups: {len(groups)}  deleted: {deleted}  errors: {errors}"
+    )
+
+
 def main():
+    force = '--force-delete' in sys.argv
+
     raw = sys.stdin.buffer.read()
     paths = [p.decode() for p in raw.split(b'\0') if p]
     if not paths:
@@ -345,12 +368,16 @@ def main():
     groups = find_duplicate_groups(paths)
 
     if not groups:
-        print("No duplicate files found.", file=sys.stderr)
+        print("No duplicate files found.")
         return
 
     total_dupes = sum(len(g) - 1 for g in groups)
     print(f"Found {len(groups)} duplicate group(s) ({total_dupes} files to review).", file=sys.stderr)
-    DeduplicatorApp(groups).mainloop()
+
+    if force:
+        force_delete_all(groups)
+    else:
+        DeduplicatorApp(groups).mainloop()
 
 
 if __name__ == '__main__':
