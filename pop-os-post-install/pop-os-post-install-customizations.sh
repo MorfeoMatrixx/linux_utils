@@ -309,7 +309,7 @@ sec_utils() {
     # ~/bin only ever holds symlinks to the sources (see ~/.claude/CLAUDE.md); name = source minus extension
     for f in backup2nas/dir-backup.sh backup2nas/dir-backup-launch.sh backup2nas/dir-sync.sh backup2nas/dir-sync-launch.sh backup2nas/sd-backup.sh grok-sync/grok-sync.sh grok-sync/grok-sync-launch.sh \
              grok-dedup/grok-dedup.sh grok-dedup/grok-dedup-ui.py grok-dedup/grok-dedup-launch.sh \
-             linux-sync/linux-sync.sh linux-sync/linux-sync-launch.sh linux-sync/linux-sync-cron-check.sh \
+             linux-sync/linux-sync.sh linux-sync/linux-sync-launch.sh \
              linux-sync/linux-sync-status.sh linux-nodes-status/linux-nodes-status.sh ssh-passwordless-setup/ssh-node-setup.sh; do
         n=$(basename "$f"); lnk "$REPO/$f" "${n%.*}"
     done
