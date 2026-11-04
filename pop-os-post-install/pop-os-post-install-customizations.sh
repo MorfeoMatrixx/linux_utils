@@ -23,6 +23,9 @@ REPO_URL=https://github.com/MorfeoMatrixx/linux_utils.git
 # The NVIDIA suspend-fix tool lives in its own repo (not linux_utils), cloned to ~/claude/pop_os_fixes
 FIXDIR=$HOME/claude/pop_os_fixes
 FIX_URL=https://github.com/MorfeoMatrixx/pop_os_fixes.git
+# Scheduler-only scripts (cron / crontab-ui jobs) live in their own repo too, cloned to ~/cron_jobs
+CRON_DIR=$HOME/cron_jobs
+CRON_URL=https://github.com/MorfeoMatrixx/cron_jobs.git
 SECTIONS=(repos apt flatpak extras system utils dotfiles plasma)
 BK=$HOME/pop-os-post-install-backup-$(date +%Y%m%d-%H%M%S)
 
@@ -76,7 +79,7 @@ ${BOLD}Sections${RESET} (run in this order)
             plasma-suspend-fix-redo from the pop_os_fixes repo; verified at the end of every run), spd5118 blacklist,
             NAS CIFS automounts + credentials (prompted), /etc/hosts pins, sudoers rule
             for system76-power, Tilix vte.sh link. With --nopasswd-sudo: passwordless sudo
-  utils     clone linux_utils to ~/claude/utils and clone linux_utils + pop_os_fixes, symlink our utilities into ~/bin + launchers
+  utils     clone linux_utils to ~/claude/utils and clone linux_utils + pop_os_fixes + cron_jobs, symlink our utilities into ~/bin + launchers
   dotfiles  ~/.bashrc block, git identity, gh login
   plasma    ${BOLD}run from inside a Plasma (X11) session${RESET}: Tilix default + Ctrl+Alt+T,
             PrtScr = region screenshot auto-saved to ~/Documents, double-click, Breeze + cosmic-jlc purple focus frame, default apps, NAS bookmarks
@@ -229,6 +232,11 @@ ensure_fixes() {
     act "clone $FIX_URL -> $FIXDIR" git clone "$FIX_URL" "$FIXDIR"
 }
 
+ensure_cron_jobs() {
+    [[ -d $CRON_DIR/.git ]] && return 0
+    act "clone $CRON_URL -> $CRON_DIR" git clone "$CRON_URL" "$CRON_DIR"
+}
+
 sec_system() {
     hdr "[system] System fixes and config (/etc)"
     local tmp
@@ -303,7 +311,7 @@ sec_system() {
 
 sec_utils() {
     hdr "[utils] Our utilities (sources in project dirs -> extension-less symlinks in ~/bin)"
-    ensure_repo; ensure_fixes
+    ensure_repo; ensure_fixes; ensure_cron_jobs
     [[ -d $REPO/.git ]] || { note "repo not cloned yet - nothing more to check"; return 0; }
     local f n T=$HOME/Electronics/MCU_DEV/tools
     # ~/bin only ever holds symlinks to the sources (see ~/.claude/CLAUDE.md); name = source minus extension
