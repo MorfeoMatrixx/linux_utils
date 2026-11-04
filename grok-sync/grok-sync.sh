@@ -30,7 +30,7 @@ else
 fi
 if [[ -z "$dedup_answer" || "${dedup_answer,,}" == "y" ]]; then
     log "Running grok-dedup on $DOWNLOADS_DIR …"
-    dedup_stats="$(grok-dedup.sh "$DOWNLOADS_DIR" --force-delete 2>&1 | tee /dev/stderr | grep '^Done' || true)"
+    dedup_stats="$(grok-dedup "$DOWNLOADS_DIR" --force-delete 2>&1 | tee /dev/stderr | grep '^Done' || true)"
     log "Dedup result: ${dedup_stats:-no duplicates found}"
 fi
 

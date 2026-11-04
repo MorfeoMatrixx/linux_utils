@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RUN_CMD="${SCRIPT_DIR}/linux-sync.sh; echo; read -p 'Done — press Enter to close'"
+RUN_CMD="${SCRIPT_DIR}/linux-sync; echo; read -p 'Done — press Enter to close'"
 
 _from_app_menu() {
     [[ -n "${DESKTOP_STARTUP_ID:-}" || -n "${XDG_ACTIVATION_TOKEN:-}" ]]

@@ -21,6 +21,6 @@ last_run="$(cat "$STATE_FILE" 2>/dev/null || true)"
 [[ "$last_run" == "$today" ]] && exit 0
 (( 10#$(date +%H%M) >= THRESHOLD_HHMM )) || exit 0
 
-if "${SCRIPT_DIR}/linux-sync.sh"; then
+if "${SCRIPT_DIR}/linux-sync"; then
     printf '%s\n' "$today" > "$STATE_FILE"
 fi

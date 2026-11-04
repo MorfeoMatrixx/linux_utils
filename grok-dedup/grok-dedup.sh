@@ -29,7 +29,7 @@ if [ "${FORCE_DELETE}" = "--force-delete" ]; then
         exit 1
     fi
     echo "Scanning: $DIR"
-    _find_media "$DIR" | python3 "${SCRIPT_DIR}/grok-dedup-ui.py" --force-delete
+    _find_media "$DIR" | python3 "${SCRIPT_DIR}/grok-dedup-ui" --force-delete
     exit 0
 fi
 
@@ -65,7 +65,7 @@ while true; do
     echo "$DIR" > "$STATE_FILE"
 
     echo "Scanning: $DIR"
-    _find_media "$DIR" | python3 "${SCRIPT_DIR}/grok-dedup-ui.py"
+    _find_media "$DIR" | python3 "${SCRIPT_DIR}/grok-dedup-ui"
 
     [ -n "$TERM_WID" ] && xdotool windowfocus "$TERM_WID" 2>/dev/null || true
 
