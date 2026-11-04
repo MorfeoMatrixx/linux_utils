@@ -12,10 +12,9 @@ Distilled from building `backup2nas/dir-backup.sh` and `sd-backup.sh`. Apply the
 
 ### Project layout
 - Source of truth lives in a repo subdirectory under `~/claude/utils/<name>/` (e.g. `backup2nas/`).
-- The installed, runnable copy lives in `~/bin/<script>.sh` (plain user scripts) or `~/.local/bin/` (system/hardware wrappers) - see script-bin-location convention in memory.
-- After every edit, copy the repo source back to the installed bin location and `chmod +x` it - don't edit the installed copy directly.
+- The runnable command is an extension-less symlink in `~/bin/` (`~/bin/grok-sync` -> `.../grok-sync/grok-sync.sh`), never a copy, and never in `~/.local/bin/`. Edit only the repo source; there is nothing to sync back. Full rules (layout, naming, checklist): `~/.claude/CLAUDE.md`.
 - Launchers (`<name>.desktop` + `<name>-launch.sh` + icon): the `.desktop` always sets `StartupNotify=true`. Without it KWin's focus-stealing prevention opens the terminal *behind* a fullscreen app (Plasma X11 + Tilix); the launch script just `exec`s the terminal so the startup-notification environment passes through. The launched *process* must also stay alive until the window exists: KDE ends the startup sequence when it exits, so a launcher that spawns a detached terminal and exits at once (as `gpu-mode`'s self-spawn did) still opens behind fullscreen apps. `exec` the terminal, or `proc.wait()` on the terminal client when `DESKTOP_STARTUP_ID`/`XDG_ACTIVATION_TOKEN` is set. Install copies to `~/.local/share/applications/` and `~/.local/share/icons/`, then `update-desktop-database`. New utilities with a launcher also go into `pop-os-post-install/pop-os-post-install-customizations.sh` (+ its `.md`).
-- Any sidecar file the script depends on at runtime (e.g. a `.dialogrc`) gets copied to `~/bin/` alongside the script, and the script resolves it relative to its own location via `SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)` (use `${BASH_SOURCE[0]}`, not `$0`, so it still works if ever sourced).
+- Any sidecar file the script depends on at runtime (e.g. a `.dialogrc`) gets symlinked into `~/bin/` alongside the script's link, and the script resolves it relative to its own location via `SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)` (use `${BASH_SOURCE[0]}`, not `$0`, so it still works if ever sourced).
 
 ### Script basics
 - `set -euo pipefail` at the top of every bash script.
