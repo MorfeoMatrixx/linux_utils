@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
 # gpu-mode-install.sh
-# Installs gpu-mode.py to ~/.local/bin and sets up the sudoers rule so the TUI
+# Symlinks gpu-mode.py into ~/bin and sets up the sudoers rule so the TUI
 # can call system76-power without a password prompt.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN_DIR="$HOME/.local/bin"
+BIN_DIR="$HOME/bin"
 APP_SRC="$SCRIPT_DIR/gpu-mode.py"
 APP_DEST="$BIN_DIR/gpu-mode"
 
 echo "==> Creating $BIN_DIR if needed..."
 mkdir -p "$BIN_DIR"
 
-echo "==> Installing gpu-mode → $APP_DEST"
-cp "$APP_SRC" "$APP_DEST"
+echo "==> Linking gpu-mode → $APP_DEST"
+ln -sfn "$APP_SRC" "$APP_DEST"
 chmod +x "$APP_DEST"
 
-# Make sure ~/.local/bin is on PATH
+# Make sure ~/bin is on PATH
 if ! echo "$PATH" | grep -q "$BIN_DIR"; then
     echo ""
     echo "  NOTE: Add this line to your ~/.bashrc or ~/.zshrc:"
-    echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
+    echo "    export PATH=\"\$HOME/bin:\$PATH\""
 fi
 
 echo ""

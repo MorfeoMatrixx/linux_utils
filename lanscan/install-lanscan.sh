@@ -1,10 +1,10 @@
 #!/bin/bash
-# Installs lanscan.sh from ~/claude/utils/lanscan source into ~/bin,
-# and symlinks /usr/local/bin so sudo can find it, no code duplication.
+# Links lanscan into ~/bin (extension-less command, symlink to the source here)
+# and into /usr/local/bin so sudo can find it. No copies, no code duplication.
 
 SRC="$HOME/claude/utils/lanscan/lanscan.sh"
-DEST="$HOME/bin/lanscan.sh"
-LINK="/usr/local/bin/lanscan.sh"
+DEST="$HOME/bin/lanscan"
+LINK="/usr/local/bin/lanscan"
 
 if [ ! -f "$SRC" ]; then
     echo "Source not found: $SRC"
@@ -12,20 +12,21 @@ if [ ! -f "$SRC" ]; then
 fi
 
 mkdir -p "$HOME/bin"
+chmod +x "$SRC"
 
-# Remove any stale real file in /usr/local/bin (old duplicate copy)
-if [ -f "$LINK" ] && [ ! -L "$LINK" ]; then
-    echo "Removing old duplicate at $LINK"
-    sudo rm -f "$LINK"
+# Retire the old extension-ful names (real file or stale link) from earlier installs
+if [ -e /usr/local/bin/lanscan.sh ] || [ -L /usr/local/bin/lanscan.sh ]; then
+    echo "Removing old /usr/local/bin/lanscan.sh"
+    sudo rm -f /usr/local/bin/lanscan.sh
 fi
+[ -L "$HOME/bin/lanscan.sh" ] && rm -f "$HOME/bin/lanscan.sh"
 
-# Copy source -> ~/bin
-cp -f "$SRC" "$DEST"
-chmod +x "$DEST"
-echo "Installed: $DEST"
+# ~/bin -> source
+ln -sfn "$SRC" "$DEST"
+echo "Linked: $DEST -> $SRC"
 
-# Symlink /usr/local/bin -> ~/bin (create or refresh)
-sudo ln -sf "$DEST" "$LINK"
+# /usr/local/bin -> ~/bin (create or refresh)
+sudo ln -sfn "$DEST" "$LINK"
 echo "Linked: $LINK -> $DEST"
 
 # Ensure ~/bin is in PATH for normal (non-sudo) use
