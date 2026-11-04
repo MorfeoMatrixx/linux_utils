@@ -23,10 +23,13 @@ either, since `sudo` already never prompts here.
    chmod 600 /home/pi/.smbcredentials_wdnas
    ```
 
-2. Install the script:
+2. Install the script. On the Pi this is a real **copy**, not a symlink: the
+   repo isn't checked out there, so the workstation convention (`~/bin` holds
+   symlinks to the repo source) doesn't apply. From the workstation, send it
+   first: `scp mount-wdnas1.sh pi@<pi-host>:`, then on the Pi:
    ```bash
    mkdir -p ~/bin
-   cp mount-wdnas1.sh ~/bin/
+   cp ~/mount-wdnas1.sh ~/bin/
    chmod +x ~/bin/mount-wdnas1.sh
    ```
 
