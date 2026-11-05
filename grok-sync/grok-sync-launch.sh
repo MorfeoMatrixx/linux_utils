@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Opens a terminal emulator to run grok-sync.sh, picking the first available one.
-# `exec` the terminal: with StartupNotify=true in the .desktop this keeps the window in front of
-# fullscreen apps. The backgrounded `terminal &` + `wait` form tried on 2026-10-26 (5714054) left
-# grok-sync behind them (the other launchers are fine with it, so it's specific to this one).
+# `exec` the terminal so this process *is* the terminal and lives until its window closes; with
+# StartupNotify=true in the .desktop that keeps KDE's startup sequence valid.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_CMD="${SCRIPT_DIR}/grok-sync ${*}; echo; read -p 'Done — press Enter to close'"
+
+# Raises the terminal if KWin leaves it behind a maximized app; logs each launch (see launcher-raise/)
+setsid -f "$SCRIPT_DIR/launcher-raise" grok-sync $$ </dev/null >/dev/null 2>&1 || true
 
 # tilix --new-process: without it, a running tilix (e.g. the HA monitor window) receives the request over
 # D-Bus and creates the window itself, which KWin then won't raise over a fullscreen app.
