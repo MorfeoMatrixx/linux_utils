@@ -7,8 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_CMD="${SCRIPT_DIR}/grok-dedup; echo; read -p 'Done — press Enter to close'"
 
-# Raises the terminal if KWin leaves it behind a maximized app; logs each launch (see launcher-raise/)
-setsid -f "$SCRIPT_DIR/launcher-raise" grok-dedup $$ </dev/null >/dev/null 2>&1 || true
+# Raises the terminal if KWin leaves it behind a maximized app (see launcher-raise/)
+setsid -f "$SCRIPT_DIR/launcher-raise" </dev/null >/dev/null 2>&1 || true
 
 # tilix --new-process: without it, a running tilix (e.g. the HA monitor window) receives the request over
 # D-Bus and creates the window itself, which KWin then won't raise over a fullscreen app.
