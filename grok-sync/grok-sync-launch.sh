@@ -8,8 +8,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_CMD="${SCRIPT_DIR}/grok-sync ${*}; echo; read -p 'Done — press Enter to close'"
 
+# tilix --new-process: without it, a running tilix (e.g. the HA monitor window) receives the request over
+# D-Bus and creates the window itself, which KWin then won't raise over a fullscreen app.
 if command -v tilix &>/dev/null; then
-    exec tilix -e bash -c "$RUN_CMD"
+    exec tilix --new-process -e bash -c "$RUN_CMD"
 elif command -v gnome-terminal &>/dev/null; then
     exec gnome-terminal -- bash -c "$RUN_CMD"
 elif command -v xterm &>/dev/null; then

@@ -718,7 +718,9 @@ def _terminal_candidates(cols, rows, shell_cmd):
         # GNOME Terminal (Pop!_OS pre-COSMIC default, still common).
         ("gnome-terminal", ["gnome-terminal", f"--geometry={geometry}",
                              "--", "sh", "-c", shell_cmd]),
-        ("tilix", ["tilix", f"--geometry={geometry}", "-e",
+        # --new-process: skip tilix's D-Bus hand-off to an already-running instance, whose
+        # windows KWin won't raise over a fullscreen app.
+        ("tilix", ["tilix", "--new-process", f"--geometry={geometry}", "-e",
                     f"sh -c {_sh_quote(shell_cmd)}"]),
         ("konsole", ["konsole", "--geometry", geometry, "-e",
                       "sh", "-c", shell_cmd]),

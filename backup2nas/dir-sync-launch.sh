@@ -12,8 +12,10 @@ _from_app_menu() {
     [[ -n "${DESKTOP_STARTUP_ID:-}" || -n "${XDG_ACTIVATION_TOKEN:-}" ]]
 }
 
+# tilix --new-process: without it, a running tilix (e.g. the HA monitor window) receives the request over
+# D-Bus and creates the window itself, which KWin then won't raise over a fullscreen app.
 if command -v tilix &>/dev/null; then
-    tilix -e bash -c "$RUN_CMD" &
+    tilix --new-process -e bash -c "$RUN_CMD" &
 elif command -v gnome-terminal &>/dev/null; then
     gnome-terminal -- bash -c "$RUN_CMD" &
 elif command -v xterm &>/dev/null; then
